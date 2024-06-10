@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# tms oler -> create a new tmux session
+alias tms='tmux new-session -A -s'
+alias tmls='tmux ls'
