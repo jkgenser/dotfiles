@@ -1,0 +1,15 @@
+# ~/.config/starship.toml
+
+# Define the custom module
+[custom.gcloud]
+when = """test -f $HOME/.config/gcloud/application_default_credentials.json || \
+        test -f $HOME/.config/gcloud/credentials.db || \
+        test -f $HOME/.config/gcloud/access_tokens.db"""
+command = """
+if [ -f $HOME/.config/gcloud/application_default_credentials.json ] || \
+   [ -f $HOME/.config/gcloud/credentials.db ] || \
+   [ -f $HOME/.config/gcloud/access_tokens.db ]; then
+   echo 'gcloud-creds-present'
+fi
+"""
+style = "bold yellow"
