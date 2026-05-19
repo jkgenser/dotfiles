@@ -3,8 +3,16 @@
 	email = 8715980+jkgenser@users.noreply.github.com
 [init]
 	defaultBranch = main
+[core]
+	editor = nvim -f
 [pull]
 	ff = only
+[merge]
+	tool = nvimdiff
+	conflictstyle = diff3
+[mergetool]
+	keepBackup = false
+	prompt = true
 [credential "https://github.com"]
 	helper = 
 	helper = !/opt/homebrew/bin/gh auth git-credential
