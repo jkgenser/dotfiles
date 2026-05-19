@@ -1,0 +1,7 @@
+[user]
+	name = Jerry Genser
+	email = 8715980+jkgenser@users.noreply.github.com
+[init]
+	defaultBranch = main
+[pull]
+	ff = only
