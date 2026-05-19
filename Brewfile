@@ -13,4 +13,4 @@ brew "zellij"
 
 cask "font-fira-code-nerd-font"
 cask "ghostty"
-cask "google-cloud-sdk"
+cask "gcloud-cli"
