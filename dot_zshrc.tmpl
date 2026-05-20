@@ -32,8 +32,8 @@ export NVM_DIR="$HOME/.config/nvm"
 [[ -s "$NVM_DIR/bash_completion" ]] && source "$NVM_DIR/bash_completion"
 {{ end -}}
 
-if [[ -f "$HOME/.fzf.zsh" ]]; then
-  source "$HOME/.fzf.zsh"
+if command -v fzf >/dev/null 2>&1; then
+  source <(fzf --zsh)
 fi
 
 if command -v starship >/dev/null 2>&1; then
