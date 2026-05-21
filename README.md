@@ -10,6 +10,9 @@ chezmoi init --apply jkgenser/dotfiles
 brew bundle --file ~/.local/share/chezmoi/Brewfile
 ```
 
+The Brewfile installs the Tailscale app. Open Tailscale after installation and
+sign in.
+
 ## Linux Bootstrap
 
 Install chezmoi, then initialize and apply this repo:
@@ -18,6 +21,13 @@ Install chezmoi, then initialize and apply this repo:
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin
 export PATH="$HOME/.local/bin:$PATH"
 chezmoi init --apply jkgenser/dotfiles
+```
+
+Install Tailscale separately, then authenticate:
+
+```sh
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
 ```
 
 `chezmoi init jkgenser/dotfiles` uses chezmoi's repo URL guessing. For a
