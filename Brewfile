@@ -1,3 +1,5 @@
+tap "hashicorp/tap"
+
 brew "chezmoi"
 brew "fd"
 brew "fzf"
@@ -8,6 +10,7 @@ brew "jq"
 brew "neovim"
 brew "ripgrep"
 brew "starship"
+brew "hashicorp/tap/terraform"
 brew "tree"
 brew "uv"
 brew "zellij"
