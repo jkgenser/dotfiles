@@ -25,6 +25,10 @@
               "thinking": { "type": "adaptive", "display": "summarized" },
               "effort": "high",
             },
+            "max": {
+              "thinking": { "type": "adaptive", "display": "summarized" },
+              "effort": "max",
+            },
           },
         },
       },
@@ -40,6 +44,10 @@
             "high": {
               "thinking": { "type": "adaptive", "display": "summarized" },
               "effort": "high",
+            },
+            "max": {
+              "thinking": { "type": "adaptive", "display": "summarized" },
+              "effort": "max",
             },
           },
         },
