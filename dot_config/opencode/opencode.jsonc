@@ -12,6 +12,40 @@
       "enabled": false,
     },
   },
+  "provider": {
+    "google-vertex": {
+      "models": {
+        "claude-opus-4-8@default": {
+          "options": {
+            "thinking": { "type": "adaptive", "display": "summarized" },
+            "effort": "high",
+          },
+          "variants": {
+            "high": {
+              "thinking": { "type": "adaptive", "display": "summarized" },
+              "effort": "high",
+            },
+          },
+        },
+      },
+    },
+    "google-vertex-anthropic": {
+      "models": {
+        "claude-opus-4-8@default": {
+          "options": {
+            "thinking": { "type": "adaptive", "display": "summarized" },
+            "effort": "high",
+          },
+          "variants": {
+            "high": {
+              "thinking": { "type": "adaptive", "display": "summarized" },
+              "effort": "high",
+            },
+          },
+        },
+      },
+    },
+  },
   "agent": {
     "explore": {
       "model": "opencode-go/deepseek-v4-flash",
