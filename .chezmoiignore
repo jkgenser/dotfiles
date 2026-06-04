@@ -1,2 +1,14 @@
 Brewfile
 README.md
+
+{{ if ne .chezmoi.os "linux" -}}
+dot_Xmodmap
+dot_config/alacritty
+dot_config/fontconfig
+dot_config/i3
+dot_config/polybar
+dot_config/rofi
+dot_config/sway
+dot_config/xdg-desktop-portal-wlr
+dot_local/scripts/executable_mouse-settings.sh
+{{ end -}}

@@ -6,7 +6,7 @@
 [core]
 	editor = nvim -f
 [pull]
-	ff = only
+	rebase = true
 [merge]
 	tool = nvimdiff
 	conflictstyle = diff3
@@ -19,3 +19,8 @@
 [credential "https://gist.github.com"]
 	helper = 
 	helper = !gh auth git-credential
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
