@@ -1,6 +1,13 @@
 const APP_NAME = "opencode"
 const TURN_DONE_MESSAGE = "Turn completed"
 const COOLDOWN_MS = 5000
+const LINUX_ICON = "/usr/share/icons/Yaru/256x256/apps/terminal-app.png"
+const LINUX_SOUND_NAMES = ["complete", "message", "bell"]
+const LINUX_SOUND_FILES = [
+  "/usr/share/sounds/freedesktop/stereo/complete.oga",
+  "/usr/share/sounds/freedesktop/stereo/message.oga",
+  "/usr/share/sounds/freedesktop/stereo/bell.oga",
+]
 
 export const NotificationPlugin = async ({ $ }) => {
   const mainSessions = new Set()
@@ -25,6 +32,43 @@ export const NotificationPlugin = async ({ $ }) => {
     return true
   }
 
+  const runQuiet = async (command, label) => {
+    try {
+      await command.quiet()
+      return true
+    } catch (error) {
+      console.error(`[notify] ${label} failed: ${error.message}`)
+      return false
+    }
+  }
+
+  const fileExists = async (path) => {
+    try {
+      await $`test -r ${path}`.quiet()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const playLinuxSound = async () => {
+    if (await commandExists("canberra-gtk-play")) {
+      for (const name of LINUX_SOUND_NAMES) {
+        if (await runQuiet($`canberra-gtk-play -i ${name}`, `canberra-gtk-play ${name}`)) return
+      }
+    }
+
+    const players = ["pw-play", "paplay"]
+    for (const player of players) {
+      if (!(await commandExists(player))) continue
+
+      for (const path of LINUX_SOUND_FILES) {
+        if (!(await fileExists(path))) continue
+        if (await runQuiet($`${player} ${path}`, `${player} ${path}`)) return
+      }
+    }
+  }
+
   const appleString = (value) => {
     return `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
   }
@@ -43,8 +87,15 @@ export const NotificationPlugin = async ({ $ }) => {
       return
     }
 
-    if (process.platform === "linux" && (await commandExists("notify-send"))) {
-      await $`notify-send ${APP_NAME} ${message}`.quiet()
+    if (process.platform === "linux") {
+      if (await commandExists("notify-send")) {
+        await runQuiet(
+          $`notify-send --app-name ${APP_NAME} --icon ${LINUX_ICON} --urgency normal --expire-time 10000 --hint=string:sound-name:complete ${APP_NAME} ${message}`,
+          "notify-send",
+        )
+      }
+
+      await playLinuxSound()
     }
   }
 

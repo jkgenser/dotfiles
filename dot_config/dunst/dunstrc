@@ -1,0 +1,59 @@
+[global]
+    monitor = 0
+    follow = none
+    width = (420, 760)
+    height = 220
+    origin = top-center
+    offset = 0x80
+    notification_limit = 3
+
+    font = FiraCode Nerd Font Mono 13
+    line_height = 4
+    format = "<b>%s</b>\n%b"
+    alignment = left
+    vertical_alignment = center
+
+    padding = 16
+    horizontal_padding = 20
+    text_icon_padding = 12
+    frame_width = 3
+    frame_color = "#8aadf4"
+    separator_height = 2
+    corner_radius = 8
+
+    icon_position = left
+    min_icon_size = 32
+    max_icon_size = 64
+
+    sort = yes
+    idle_threshold = 120
+    markup = full
+    show_age_threshold = 60
+    ellipsize = middle
+    ignore_newline = no
+    stack_duplicates = true
+    hide_duplicate_count = false
+    show_indicators = yes
+
+[urgency_low]
+    background = "#1e1e2e"
+    foreground = "#cad3f5"
+    timeout = 8
+
+[urgency_normal]
+    background = "#1e1e2e"
+    foreground = "#cad3f5"
+    timeout = 10
+
+[urgency_critical]
+    background = "#5b2245"
+    foreground = "#ffffff"
+    frame_color = "#f5a97f"
+    timeout = 0
+
+[opencode]
+    appname = opencode
+    background = "#2b5878"
+    foreground = "#ffffff"
+    frame_color = "#a6da95"
+    timeout = 12
