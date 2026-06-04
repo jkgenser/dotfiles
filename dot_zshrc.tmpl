@@ -1,6 +1,7 @@
 HISTSIZE=1000000
 SAVEHIST=1000000
 HISTFILE="$HOME/.zsh_history"
+HISTORY_IGNORE="export*"
 
 setopt APPEND_HISTORY
 setopt SHARE_HISTORY
@@ -22,18 +23,37 @@ if [[ -x /opt/homebrew/bin/brew ]]; then
 fi
 {{ else if eq .chezmoi.os "linux" -}}
 export ELECTRON_OZONE_PLATFORM_HINT=wayland
+export OPENCODE_ENABLE_EXPERIMENTAL_MODELS=true
+export PYTHONBREAKPOINT=ipdb.set_trace
 
 export PATH="$PATH:$HOME/.local/bin"
 export PATH="$PATH:$HOME/.local/scripts"
 export PATH="$PATH:$HOME/.cargo/bin"
 
+if [[ -d "$HOME/.opencode/bin" ]]; then
+  export PATH="$HOME/.opencode/bin:$PATH"
+fi
+
 export NVM_DIR="$HOME/.config/nvm"
 [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
 [[ -s "$NVM_DIR/bash_completion" ]] && source "$NVM_DIR/bash_completion"
+
+[[ -f "$HOME/google-cloud-sdk/path.zsh.inc" ]] && source "$HOME/google-cloud-sdk/path.zsh.inc"
+[[ -f "$HOME/google-cloud-sdk/completion.zsh.inc" ]] && source "$HOME/google-cloud-sdk/completion.zsh.inc"
+
+if command -v ssh-agent >/dev/null 2>&1; then
+  if [[ ! -f "$HOME/.ssh/ssh-agent-info" ]] || ! pgrep -u "$USER" ssh-agent >/dev/null 2>&1; then
+    mkdir -p "$HOME/.ssh"
+    ssh-agent -s > "$HOME/.ssh/ssh-agent-info"
+  fi
+  source "$HOME/.ssh/ssh-agent-info" >/dev/null
+fi
 {{ end -}}
 
 if command -v fzf >/dev/null 2>&1; then
   source <(fzf --zsh)
+elif [[ -f "$HOME/.fzf.zsh" ]]; then
+  source "$HOME/.fzf.zsh"
 fi
 
 if command -v starship >/dev/null 2>&1; then
@@ -43,6 +63,7 @@ fi
 if [[ -d "$HOME/.bun" ]]; then
   export BUN_INSTALL="$HOME/.bun"
   export PATH="$BUN_INSTALL/bin:$PATH"
+  [[ -s "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
 fi
 
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"

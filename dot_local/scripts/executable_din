@@ -1,0 +1,4 @@
+#!/bin/bash
+service_name=$1
+hash=$(docker ps -f "name=$1" | awk 'FNR == 2 {print $1}')
+docker exec -it $hash /bin/bash

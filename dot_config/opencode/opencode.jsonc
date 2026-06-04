@@ -6,12 +6,18 @@
     "webfetch": "allow",
   },
   "mcp": {
+    "semble": {
+      "type": "local",
+      "command": ["uvx", "--from", "semble[mcp]", "semble"],
+      "enabled": true,
+    },
     "playwright": {
       "type": "local",
       "command": ["npx", "@playwright/mcp@latest"],
       "enabled": false,
     },
   },
+  "lsp": true,
   "provider": {
     "google-vertex": {
       "models": {
