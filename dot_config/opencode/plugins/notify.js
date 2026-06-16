@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process"
+
 const APP_NAME = "opencode"
 const TURN_DONE_MESSAGE = "Turn completed"
 const COOLDOWN_MS = 5000
@@ -35,6 +37,18 @@ export const NotificationPlugin = async ({ $ }) => {
   const runQuiet = async (command, label) => {
     try {
       await command.quiet()
+      return true
+    } catch (error) {
+      console.error(`[notify] ${label} failed: ${error.message}`)
+      return false
+    }
+  }
+
+  const spawnQuiet = (command, args, label) => {
+    try {
+      const child = spawn(command, args, { detached: true, stdio: "ignore" })
+      child.on("error", (error) => console.error(`[notify] ${label} failed: ${error.message}`))
+      child.unref()
       return true
     } catch (error) {
       console.error(`[notify] ${label} failed: ${error.message}`)
@@ -88,12 +102,23 @@ export const NotificationPlugin = async ({ $ }) => {
     }
 
     if (process.platform === "linux") {
-      if (await commandExists("notify-send")) {
-        await runQuiet(
-          $`notify-send --app-name ${APP_NAME} --icon ${LINUX_ICON} --urgency normal --expire-time 10000 --hint=string:sound-name:complete ${APP_NAME} ${message}`,
-          "notify-send",
-        )
-      }
+      spawnQuiet(
+        "notify-send",
+        [
+          "--app-name",
+          APP_NAME,
+          "--icon",
+          LINUX_ICON,
+          "--urgency",
+          "normal",
+          "--expire-time",
+          "10000",
+          "--hint=string:sound-name:complete",
+          APP_NAME,
+          message,
+        ],
+        "notify-send",
+      )
 
       await playLinuxSound()
     }
