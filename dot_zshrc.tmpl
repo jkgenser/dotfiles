@@ -21,6 +21,11 @@ export EDITOR=nvim
 if [[ -x /opt/homebrew/bin/brew ]]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
+if [[ -x /opt/homebrew/bin/python3.12 ]]; then
+  export CLOUDSDK_PYTHON="/opt/homebrew/bin/python3.12"
+elif [[ -x /usr/local/bin/python3.12 ]]; then
+  export CLOUDSDK_PYTHON="/usr/local/bin/python3.12"
+fi
 {{ else if eq .chezmoi.os "linux" -}}
 export ELECTRON_OZONE_PLATFORM_HINT=wayland
 export OPENCODE_ENABLE_EXPERIMENTAL_MODELS=true
