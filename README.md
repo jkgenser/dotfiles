@@ -13,6 +13,7 @@ Install chezmoi, apply the dotfiles, then install packages from the Brewfile:
 brew install chezmoi
 chezmoi init --apply jkgenser/dotfiles
 brew bundle --file ~/.local/share/chezmoi/Brewfile
+curl -fsSL https://pi.dev/install.sh | sh
 ```
 
 The Brewfile installs the Tailscale app. Open Tailscale after installation and
@@ -47,8 +48,12 @@ Install optional developer tools as needed:
 curl -sS https://starship.rs/install.sh | sh
 curl -LsSf https://astral.sh/uv/install.sh | sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+curl -fsSL https://pi.dev/install.sh | sh
 curl -fsSL https://opencode.ai/install | bash
 ```
+
+The shell config adds `~/.local/bin`, `~/.pi/bin`, and Pi's managed Node path
+when present so locally installed Pi is visible on Linux and macOS.
 
 Install Tailscale separately, then authenticate:
 

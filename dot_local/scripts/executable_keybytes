@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+import sys
+import termios
+import tty
+import select
+
+
+KITTY_FLAGS = {
+    "--kitty": 7,
+    "--kitty-no-events": 5,
+    "--kitty-basic": 1,
+}
+
+
+def kitty_flags(args):
+    for arg, flags in KITTY_FLAGS.items():
+        if arg in args:
+            return flags
+    return None
+
+
+def print_usage():
+    print("Usage: keybytes [--kitty|--kitty-no-events|--kitty-basic|--modify-other-keys|--pi-query]")
+
+
+def should_exit(data):
+    # Raw Ctrl-C, plain q, Escape, and common Kitty Ctrl-C encodings.
+    exit_sequences = {
+        b"q",
+        b"\x1b",
+        b"\x1b[99;5u",
+        b"\x1b[99;5:1u",
+        b"\x1b[113u",
+        b"\x1b[113;1u",
+        b"\x1b[113;1:1u",
+    }
+    return b"\x03" in data or data in exit_sequences
+
+
+def main():
+    args = sys.argv[1:]
+    if "--help" in args or "-h" in args:
+        print_usage()
+        return
+    flags = kitty_flags(args)
+    modify_other_keys = "--modify-other-keys" in args
+    pi_query = "--pi-query" in args
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    print("Press keys to inspect. Ctrl-C exits.")
+    if flags is not None:
+        print(f"Enabling Kitty keyboard protocol flags={flags}.")
+    if modify_other_keys:
+        print("Enabling xterm modifyOtherKeys level 2.")
+    if pi_query:
+        print("Sending Pi's startup keyboard query.")
+
+    try:
+        tty.setraw(fd)
+        if pi_query:
+            sys.stdout.write("\x1b[>7u\x1b[?u\x1b[c")
+            sys.stdout.flush()
+        if flags is not None:
+            sys.stdout.write(f"\x1b[>{flags}u")
+            sys.stdout.flush()
+        if modify_other_keys:
+            sys.stdout.write("\x1b[>4;2m")
+            sys.stdout.flush()
+        while True:
+            data = sys.stdin.buffer.read(1)
+            if not data:
+                continue
+            while select.select([sys.stdin], [], [], 0.02)[0]:
+                data += sys.stdin.buffer.read(1)
+            if should_exit(data):
+                break
+            print(" ".join(f"0x{byte:02x}" for byte in data), flush=True)
+    finally:
+        if flags is not None or pi_query:
+            sys.stdout.write("\x1b[<u")
+            sys.stdout.flush()
+        if modify_other_keys:
+            sys.stdout.write("\x1b[>4;0m")
+            sys.stdout.flush()
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        print()
+
+
+if __name__ == "__main__":
+    main()

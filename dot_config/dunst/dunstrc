@@ -57,3 +57,10 @@
     foreground = "#ffffff"
     frame_color = "#a6da95"
     timeout = 12
+
+[pi]
+    appname = pi
+    background = "#2b5878"
+    foreground = "#ffffff"
+    frame_color = "#a6da95"
+    timeout = 12

@@ -17,21 +17,35 @@ bindkey '\e[1;5D' backward-word
 
 export EDITOR=nvim
 
+if [[ -d "$HOME/.local/bin" ]]; then
+  export PATH="$HOME/.local/bin:$PATH"
+fi
+
+if [[ -d "$HOME/.pi/bin" ]]; then
+  export PATH="$HOME/.pi/bin:$PATH"
+fi
+
+if [[ -d "$HOME/.local/share/pi-node/current/bin" ]]; then
+  export PATH="$HOME/.local/share/pi-node/current/bin:$PATH"
+fi
+
+if [[ -z "$GOOGLE_CLOUD_LOCATION" && -n "$VERTEX_LOCATION" ]]; then
+  export GOOGLE_CLOUD_LOCATION="$VERTEX_LOCATION"
+fi
+
+if [[ "$TERM" == alacritty* ]]; then
+  export PI_TUI_KITTY_KEYBOARD_FLAGS=0
+fi
+
 {{ if eq .chezmoi.os "darwin" -}}
 if [[ -x /opt/homebrew/bin/brew ]]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
-fi
-if [[ -x /opt/homebrew/bin/python3.12 ]]; then
-  export CLOUDSDK_PYTHON="/opt/homebrew/bin/python3.12"
-elif [[ -x /usr/local/bin/python3.12 ]]; then
-  export CLOUDSDK_PYTHON="/usr/local/bin/python3.12"
 fi
 {{ else if eq .chezmoi.os "linux" -}}
 export ELECTRON_OZONE_PLATFORM_HINT=wayland
 export OPENCODE_ENABLE_EXPERIMENTAL_MODELS=true
 export PYTHONBREAKPOINT=ipdb.set_trace
 
-export PATH="$PATH:$HOME/.local/bin"
 export PATH="$PATH:$HOME/.local/scripts"
 export PATH="$PATH:$HOME/.cargo/bin"
 
