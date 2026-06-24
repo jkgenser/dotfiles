@@ -1,8 +1,8 @@
 ---
-description: Use for focused code implementation, refactors, bug fixes, tests, and verification work.
+description: Use for straightforward code implementation, simple refactors, bug fixes, and routine changes where minimal reasoning is needed.
 mode: subagent
 model: openai/gpt-5.5-fast
-variant: high
+variant: low
 options:
   reasoningSummary: auto
   textVerbosity: low
