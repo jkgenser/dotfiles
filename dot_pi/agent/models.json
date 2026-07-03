@@ -1,0 +1,26 @@
+{
+  "providers": {
+    "openai-codex": {
+      "models": [
+        {
+          "id": "gpt-5.5-priority",
+          "name": "GPT-5.5 Priority",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "minimal": "low"
+          },
+          "input": ["text", "image"],
+          "cost": {
+            "input": 12.5,
+            "output": 75,
+            "cacheRead": 1.25,
+            "cacheWrite": 0
+          },
+          "contextWindow": 272000,
+          "maxTokens": 128000
+        }
+      ]
+    }
+  }
+}
