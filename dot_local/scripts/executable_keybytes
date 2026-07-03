@@ -24,17 +24,22 @@ def print_usage():
 
 
 def should_exit(data):
-    # Raw Ctrl-C, plain q, Escape, and common Kitty Ctrl-C encodings.
-    exit_sequences = {
-        b"q",
-        b"\x1b",
+    # Raw Ctrl-C, plain q, and common Kitty Ctrl-C encodings.
+    # Do not exit on raw Escape: terminal query replies can arrive split with
+    # an ESC byte first, especially after --pi-query.
+    ctrl_c_sequences = (
         b"\x1b[99;5u",
         b"\x1b[99;5:1u",
+        b"\x1b[99;5:2u",
+        b"\x1b[99;5:3u",
+    )
+    exit_sequences = {
+        b"q",
         b"\x1b[113u",
         b"\x1b[113;1u",
         b"\x1b[113;1:1u",
     }
-    return b"\x03" in data or data in exit_sequences
+    return b"\x03" in data or data in exit_sequences or any(seq in data for seq in ctrl_c_sequences)
 
 
 def main():

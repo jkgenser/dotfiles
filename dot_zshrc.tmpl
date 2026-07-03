@@ -17,10 +17,6 @@ bindkey '\e[1;5D' backward-word
 
 export EDITOR=nvim
 
-if [[ -d "$HOME/.local/bin" ]]; then
-  export PATH="$HOME/.local/bin:$PATH"
-fi
-
 if [[ -d "$HOME/.pi/bin" ]]; then
   export PATH="$HOME/.pi/bin:$PATH"
 fi
@@ -29,12 +25,12 @@ if [[ -d "$HOME/.local/share/pi-node/current/bin" ]]; then
   export PATH="$HOME/.local/share/pi-node/current/bin:$PATH"
 fi
 
-if [[ -z "$GOOGLE_CLOUD_LOCATION" && -n "$VERTEX_LOCATION" ]]; then
-  export GOOGLE_CLOUD_LOCATION="$VERTEX_LOCATION"
+if [[ -d "$HOME/.local/bin" ]]; then
+  export PATH="$HOME/.local/bin:$PATH"
 fi
 
-if [[ "$TERM" == alacritty* ]]; then
-  export PI_TUI_KITTY_KEYBOARD_FLAGS=0
+if [[ -z "$GOOGLE_CLOUD_LOCATION" && -n "$VERTEX_LOCATION" ]]; then
+  export GOOGLE_CLOUD_LOCATION="$VERTEX_LOCATION"
 fi
 
 {{ if eq .chezmoi.os "darwin" -}}

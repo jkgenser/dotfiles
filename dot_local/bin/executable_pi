@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+
+set -eu
+
+pi_node_dir="$HOME/.local/share/pi-node/current/bin"
+pi_node="$pi_node_dir/node"
+pi_cli="$pi_node_dir/pi"
+
+if [ ! -x "$pi_node" ] || [ ! -e "$pi_cli" ]; then
+  printf '%s\n' "pi wrapper: managed Pi node or CLI not found under $pi_node_dir" >&2
+  exit 127
+fi
+
+exec "$pi_node" "$pi_cli" "$@"

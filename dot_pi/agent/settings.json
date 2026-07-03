@@ -1,8 +1,8 @@
 {
   "theme": "dark",
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.5",
-  "defaultThinkingLevel": "low",
+  "defaultModel": "gpt-5.5-priority",
+  "defaultThinkingLevel": "off",
   "enabledModels": [
     "openai-codex/gpt-5.5-priority"
   ],
