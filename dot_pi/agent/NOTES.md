@@ -2,7 +2,7 @@
 
 ## Todos
 
-- Figure out the Pi equivalent of OpenCode's plan mode. Start by trying read-only tool allowlists such as `pi --tools read,grep,find,ls`, then decide whether a prompt template or extension is worth adding.
+- Pi equivalent of OpenCode's plan mode is installed from Pi's shipped `examples/extensions/plan-mode` into `extensions/plan-mode`, alongside `extensions/questionnaire.ts`. Use `/plan` or Ctrl+Alt+P to enter read-only planning, then execute tracked plan steps.
 - Figure out whether Pi needs an LSP/diagnostics replacement, or whether project test/typecheck commands are enough.
 - Verify the exact Pi model selector for Google Vertex Claude Opus.
 - Subagents are installed from Pi's shipped `examples/extensions/subagent` into `extensions/subagent`, with user agents in `agents/` and workflows in `prompts/`. `agents/scout.md` uses `deepseek/deepseek-v4-flash:high`; planner/reviewer use `openai-codex/gpt-5.5:xhigh`; implementation uses one `worker` agent with dynamic `effort: medium|high|xhigh`, which maps to `gpt-5.5:<effort>` and lazily loads `agents/worker-profiles/<effort>.md`.
