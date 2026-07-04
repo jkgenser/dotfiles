@@ -2,9 +2,10 @@
   "theme": "dark",
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.5-priority",
-  "defaultThinkingLevel": "off",
+  "defaultThinkingLevel": "high",
   "enabledModels": [
     "openai-codex/gpt-5.5-priority"
   ],
-  "lastChangelogVersion": "0.80.3"
+  "lastChangelogVersion": "0.80.3",
+  "packages": []
 }
