@@ -82,6 +82,16 @@ This matters when removing Pi packages. For example, after running
 the chezmoi source still contains `"npm:context-mode"`. Re-add the file before
 committing dotfiles so `chezmoi apply` does not bring the removed package back.
 
+## Pi Fast Mode
+
+Pi uses the real `openai-codex/gpt-5.5` model. The local extension at
+`dot_pi/agent/extensions/service-tier-priority.ts` adds `/fast [on|off|toggle]`,
+which toggles OpenAI `service_tier: "priority"` for supported GPT-5.4/GPT-5.5
+OpenAI and OpenAI Codex requests. The toggle state persists in the live Pi agent
+directory under `~/.pi/agent/extensions/fast-mode/config.json`. This avoids fake
+model aliases like `gpt-5.5-priority`, so `/compact` can call a real Codex model
+id.
+
 Install Tailscale separately, then authenticate:
 
 ```sh
