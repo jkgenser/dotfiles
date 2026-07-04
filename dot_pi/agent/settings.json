@@ -4,7 +4,11 @@
   "defaultModel": "gpt-5.5",
   "defaultThinkingLevel": "low",
   "enabledModels": [
-    "openai-codex/gpt-5.5"
+    "openai-codex/gpt-5.5",
+    "deepseek-*",
+    "claude-opus-4-*",
+    "claude-fable-5",
+    "google-vertex/gemini-3.5-flash"
   ],
   "lastChangelogVersion": "0.80.3",
   "packages": []
