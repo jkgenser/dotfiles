@@ -1,13 +1,15 @@
 {
   "theme": "dark",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.5",
-  "defaultThinkingLevel": "low",
+  "defaultProvider": "anthropic-vertex",
+  "defaultModel": "claude-opus-4-6",
+  "defaultThinkingLevel": "high",
   "enabledModels": [
     "openai-codex/gpt-5.5",
-    "deepseek-*",
-    "claude-opus-4-*",
-    "claude-fable-5",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro",
+    "anthropic-vertex/claude-opus-4-6",
+    "anthropic-vertex/claude-opus-4-8",
+    "anthropic-vertex/claude-fable-5",
     "google-vertex/gemini-3.5-flash"
   ],
   "lastChangelogVersion": "0.80.3",
