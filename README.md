@@ -55,6 +55,33 @@ curl -fsSL https://opencode.ai/install | bash
 The shell config adds `~/.local/bin`, `~/.pi/bin`, and Pi's managed Node path
 when present so locally installed Pi is visible on Linux and macOS.
 
+## Pi Settings and Chezmoi Sync
+
+Pi treats `~/.pi/agent/settings.json` as live application state. Commands such
+as `pi install`, `pi remove`, `/settings`, `/model`, and thinking-level changes
+can edit that file directly. Chezmoi tracks the separate source copy at
+`dot_pi/agent/settings.json`, so Pi changes can leave the live file and chezmoi
+source out of sync.
+
+To inspect Pi's live changes before pulling them into chezmoi, use a reverse
+diff:
+
+```sh
+chezmoi diff --reverse ~/.pi/agent/settings.json
+```
+
+If the live Pi settings are correct, re-add the file to update the chezmoi
+source:
+
+```sh
+chezmoi add ~/.pi/agent/settings.json
+```
+
+This matters when removing Pi packages. For example, after running
+`pi remove npm:context-mode`, the live settings may have `"packages": []` while
+the chezmoi source still contains `"npm:context-mode"`. Re-add the file before
+committing dotfiles so `chezmoi apply` does not bring the removed package back.
+
 Install Tailscale separately, then authenticate:
 
 ```sh
