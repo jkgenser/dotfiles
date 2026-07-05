@@ -1,8 +1,8 @@
 {
   "theme": "dark",
-  "defaultProvider": "anthropic-vertex",
-  "defaultModel": "claude-opus-4-6",
-  "defaultThinkingLevel": "high",
+  "defaultProvider": "deepseek",
+  "defaultModel": "deepseek-v4-flash",
+  "defaultThinkingLevel": "xhigh",
   "enabledModels": [
     "openai-codex/gpt-5.5",
     "deepseek/deepseek-v4-flash",

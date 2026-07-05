@@ -1,5 +1,6 @@
-import { spawn, spawnSync } from "node:child_process"
-import { accessSync, constants } from "node:fs"
+import { spawn } from "node:child_process"
+import { constants } from "node:fs"
+import { access } from "node:fs/promises"
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 
 const APP_NAME = "pi"
@@ -39,13 +40,28 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  const commandCache = new Map<string, Promise<boolean> | boolean>()
+
   const commandExists = async (command: string) => {
-    return spawnSync("sh", ["-lc", `command -v ${command}`], { stdio: "ignore" }).status === 0
+    const cached = commandCache.get(command)
+    if (typeof cached === "boolean") return cached
+    if (cached) return cached
+
+    const check = new Promise<boolean>((resolve) => {
+      const child = spawn("sh", ["-lc", `command -v ${command}`], { stdio: "ignore" })
+      child.on("error", () => resolve(false))
+      child.on("close", (code) => resolve(code === 0))
+    })
+
+    commandCache.set(command, check)
+    const exists = await check
+    commandCache.set(command, exists)
+    return exists
   }
 
   const fileExists = async (path: string) => {
     try {
-      accessSync(path, constants.R_OK)
+      await access(path, constants.R_OK)
       return true
     } catch {
       return false
@@ -53,17 +69,34 @@ export default function (pi: ExtensionAPI) {
   }
 
   const runQuiet = async (command: string, args: string[], label: string) => {
-    const result = spawnSync(command, args, { stdio: "ignore" })
+    return new Promise<boolean>((resolve) => {
+      let settled = false
+      const settle = (value: boolean) => {
+        if (settled) return
+        settled = true
+        resolve(value)
+      }
 
-    if (result.status === 0) return true
-
-    if (result.error) {
-      console.error(`[notify] ${label} failed: ${result.error.message}`)
-      return false
-    }
-
-    console.error(`[notify] ${label} exited with status ${result.status}`)
-    return false
+      try {
+        const child = spawn(command, args, { stdio: "ignore" })
+        child.on("error", (error) => {
+          console.error(`[notify] ${label} failed: ${error.message}`)
+          settle(false)
+        })
+        child.on("close", (code) => {
+          if (code === 0) {
+            settle(true)
+            return
+          }
+          console.error(`[notify] ${label} exited with status ${code}`)
+          settle(false)
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        console.error(`[notify] ${label} failed: ${message}`)
+        settle(false)
+      }
+    })
   }
 
   const playLinuxSound = async () => {
@@ -124,7 +157,14 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  pi.on("agent_end", async () => {
-    if (shouldNotify("agent_end")) await notify(TURN_DONE_MESSAGE)
+  pi.on("agent_end", () => {
+    if (!shouldNotify("agent_end")) return
+
+    setImmediate(() => {
+      void notify(TURN_DONE_MESSAGE).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        console.error(`[notify] notification failed: ${message}`)
+      })
+    })
   })
 }
