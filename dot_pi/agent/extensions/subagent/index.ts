@@ -39,6 +39,7 @@ const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
 const COLLAPSED_ITEM_COUNT = 10;
 const PER_TASK_OUTPUT_CAP = 50 * 1024;
+const SUPPRESS_AGENT_END_NOTIFY_ENV = "PI_SUPPRESS_AGENT_END_NOTIFY";
 
 function formatTokens(count: number): string {
 	if (count < 1000) return count.toString();
@@ -416,6 +417,10 @@ async function runSingleAgent(
 			const invocation = getPiInvocation(args);
 			const proc = spawn(invocation.command, invocation.args, {
 				cwd: cwd ?? defaultCwd,
+				env: {
+					...process.env,
+					[SUPPRESS_AGENT_END_NOTIFY_ENV]: "1",
+				},
 				shell: false,
 				stdio: ["ignore", "pipe", "pipe"],
 			});

@@ -5,6 +5,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 
 const APP_NAME = "pi"
 const TURN_DONE_MESSAGE = "Turn completed"
+const SUPPRESS_AGENT_END_NOTIFY_ENV = "PI_SUPPRESS_AGENT_END_NOTIFY"
 const COOLDOWN_MS = 5000
 const LINUX_ICON = "/usr/share/icons/Yaru/256x256/apps/terminal-app.png"
 const LINUX_SOUND_NAMES = ["complete", "message", "bell"]
@@ -158,6 +159,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on("agent_end", () => {
+    if (process.env[SUPPRESS_AGENT_END_NOTIFY_ENV] === "1") return
     if (!shouldNotify("agent_end")) return
 
     setImmediate(() => {
