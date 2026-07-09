@@ -55,6 +55,37 @@ curl -fsSL https://opencode.ai/install | bash
 The shell config adds `~/.local/bin`, `~/.pi/bin`, and Pi's managed Node path
 when present so locally installed Pi is visible on Linux and macOS.
 
+## OpenWhispr on Linux
+
+OpenWhispr is installed separately from this repo. Download the latest Ubuntu
+`.deb` from the [OpenWhispr releases page](https://github.com/OpenWhispr/openwhispr/releases/latest),
+then install it:
+
+```sh
+sudo apt install ./OpenWhispr-*-linux-amd64.deb
+```
+
+The package installs its launcher at `/opt/OpenWhispr/open-whispr` and a desktop
+entry at `/usr/share/applications/open-whispr.desktop`. Rofi/wofi/dmenu-style
+app launchers that read `.desktop` files should pick up **OpenWhispr** without
+extra dotfile config.
+
+This repo also provides a Linux-only `~/.local/bin/open-whispr` helper. It
+launches OpenWhispr if needed, or focuses the existing window on sway/i3:
+
+```sh
+open-whispr
+```
+
+For local meeting transcription, start with local speech-to-text models in the
+app settings: try Parakeet first for speed, then Whisper base/turbo/small for
+quality comparison. On sway, if the window starts but does not appear focused,
+the helper runs the equivalent of:
+
+```sh
+swaymsg '[class="open-whispr"] focus'
+```
+
 ## Pi Settings and Chezmoi Sync
 
 Pi treats `~/.pi/agent/settings.json` as live application state. Commands such
