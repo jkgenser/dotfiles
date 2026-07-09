@@ -37,11 +37,12 @@ const DESTRUCTIVE_PATTERNS = [
 	/\bshutdown\b/i,
 	/\bsystemctl\s+(start|stop|restart|enable|disable)/i,
 	/\bservice\s+\S+\s+(start|stop|restart)/i,
-	/\b(vim?|nano|emacs|code|subl)\b/i,
+	/(^|[;&|]\s*)(vim?|nano|emacs|code|subl)\b/i,
 ];
 
 // Safe read-only commands allowed in plan mode
 const SAFE_PATTERNS = [
+	/^\s*cd\s+("[^"]+"|'[^']+'|[^\s;&|]+)\s*&&\s*(cat|head|tail|less|more|grep|find|ls|pwd|echo|printf|wc|sort|uniq|diff|file|stat|du|df|tree|which|whereis|type|env|printenv|uname|whoami|id|date|cal|uptime|ps|top|htop|free|git\s+(status|log|diff|show|branch|remote|config\s+--get|ls-)|npm\s+(list|ls|view|info|search|outdated|audit)|yarn\s+(list|info|why|audit)|node\s+--version|python\s+--version|curl\s|wget\s+-O\s*-|jq|sed\s+-n|awk|rg|fd|bat|eza)\b/i,
 	/^\s*cat\b/,
 	/^\s*head\b/,
 	/^\s*tail\b/,
@@ -95,7 +96,10 @@ const SAFE_PATTERNS = [
 ];
 
 export function isSafeCommand(command: string): boolean {
-	const isDestructive = DESTRUCTIVE_PATTERNS.some((p) => p.test(command));
+	// Common read-only probes often suppress grep/find noise with stderr to /dev/null.
+	// Treat that specific redirection as non-destructive while still blocking file writes.
+	const commandForDestructiveCheck = command.replace(/\s*2>\s*\/dev\/null/g, "");
+	const isDestructive = DESTRUCTIVE_PATTERNS.some((p) => p.test(commandForDestructiveCheck));
 	const isSafe = SAFE_PATTERNS.some((p) => p.test(command));
 	return !isDestructive && isSafe;
 }

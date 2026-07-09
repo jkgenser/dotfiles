@@ -239,7 +239,8 @@ Remaining steps:
 ${todoList}
 
 Execute each step in order.
-After completing a step, include a [DONE:n] tag in your response.`,
+When you finish a step, immediately emit its [DONE:n] marker on its own line before continuing.
+Do not wait until the final response to mark intermediate steps done.`,
 					display: false,
 				},
 			};
@@ -321,7 +322,8 @@ Remaining steps:
 ${remainingList}
 
 Start with: ${firstTodoItem.text}
-After completing a step, include a [DONE:n] tag in your response.`;
+When you finish a step, immediately emit its [DONE:n] marker on its own line before continuing.
+Do not wait until the final response to mark intermediate steps done.`;
 			pi.sendMessage(planTodoListMessage, { deliverAs: "followUp" });
 			pi.sendMessage(
 				{ customType: "plan-mode-execute", content: execMessage, display: true },
