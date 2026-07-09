@@ -27,8 +27,15 @@ const CONFIG_PATH = join(getAgentDir(), "extensions", "fast-mode", "config.json"
 const FAST_TARGETS: Record<string, FastTarget> = {
   "openai/gpt-5.4": { serviceTier: "priority" },
   "openai/gpt-5.5": { serviceTier: "priority" },
+  "openai/gpt-5.6": { serviceTier: "priority" },
+  "openai/gpt-5.6-luna": { serviceTier: "priority" },
+  "openai/gpt-5.6-sol": { serviceTier: "priority" },
+  "openai/gpt-5.6-terra": { serviceTier: "priority" },
   "openai-codex/gpt-5.4": { serviceTier: "priority" },
   "openai-codex/gpt-5.5": { serviceTier: "priority" },
+  "openai-codex/gpt-5.6-luna": { serviceTier: "priority" },
+  "openai-codex/gpt-5.6-sol": { serviceTier: "priority" },
+  "openai-codex/gpt-5.6-terra": { serviceTier: "priority" },
 }
 
 const isPayloadObject = (payload: unknown): payload is ProviderPayload => {

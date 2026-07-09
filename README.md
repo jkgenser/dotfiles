@@ -115,13 +115,14 @@ committing dotfiles so `chezmoi apply` does not bring the removed package back.
 
 ## Pi Fast Mode
 
-Pi uses the real `openai-codex/gpt-5.5` model. The local extension at
+Pi defaults to the real `openai-codex/gpt-5.6-sol` model, with GPT-5.5 retained
+as a temporary fallback in the model scope. The local extension at
 `dot_pi/agent/extensions/service-tier-priority.ts` adds `/fast [on|off|toggle]`,
-which toggles OpenAI `service_tier: "priority"` for supported GPT-5.4/GPT-5.5
-OpenAI and OpenAI Codex requests. The toggle state persists in the live Pi agent
-directory under `~/.pi/agent/extensions/fast-mode/config.json`. This avoids fake
-model aliases like `gpt-5.5-priority`, so `/compact` can call a real Codex model
-id.
+which toggles OpenAI `service_tier: "priority"` for supported GPT-5.4, GPT-5.5,
+and GPT-5.6 family requests through OpenAI and OpenAI Codex. The toggle state
+persists in the live Pi agent directory under
+`~/.pi/agent/extensions/fast-mode/config.json`. This avoids fake priority model
+aliases, so `/compact` can call a real Codex model id.
 
 Install Tailscale separately, then authenticate:
 
