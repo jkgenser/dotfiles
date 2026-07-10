@@ -30,7 +30,8 @@ import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
-const WORKER_AGENT_NAME = "worker";
+const IMPLEMENTATION_AGENT_NAMES = ["worker-lite", "worker"] as const;
+const IMPLEMENTATION_AGENT_NAME_SET = new Set<string>(IMPLEMENTATION_AGENT_NAMES);
 const WORKER_EFFORTS = ["medium", "high", "xhigh"] as const;
 type WorkerEffort = (typeof WORKER_EFFORTS)[number];
 const THINKING_SUFFIX_RE = /:(off|minimal|low|medium|high|xhigh)$/;
@@ -78,8 +79,12 @@ function isWorkerEffort(value: unknown): value is WorkerEffort {
 	return WORKER_EFFORTS.includes(value as WorkerEffort);
 }
 
+function isImplementationAgent(agentName: string): boolean {
+	return IMPLEMENTATION_AGENT_NAME_SET.has(agentName);
+}
+
 function getDisplayEffort(agentName: string, effort: unknown): WorkerEffort | undefined {
-	if (agentName !== WORKER_AGENT_NAME) return undefined;
+	if (!isImplementationAgent(agentName)) return undefined;
 	return isWorkerEffort(effort) ? effort : "medium";
 }
 
@@ -280,9 +285,9 @@ interface AgentRuntime {
 }
 
 function resolveAgentRuntime(agent: AgentConfig, requestedEffort: WorkerEffort | undefined): AgentRuntime {
-	if (agent.name !== WORKER_AGENT_NAME) {
+	if (!isImplementationAgent(agent.name)) {
 		if (requestedEffort) {
-			throw new Error(`The effort parameter is only supported for the ${WORKER_AGENT_NAME} agent.`);
+			throw new Error(`The effort parameter is only supported for: ${IMPLEMENTATION_AGENT_NAMES.join(", ")}.`);
 		}
 		return { model: agent.model, systemPrompt: agent.systemPrompt };
 	}
@@ -294,7 +299,7 @@ function resolveAgentRuntime(agent: AgentConfig, requestedEffort: WorkerEffort |
 		profilePrompt = fs.readFileSync(profilePath, "utf-8");
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`Failed to load worker ${effort} profile from ${profilePath}: ${message}`);
+		throw new Error(`Failed to load ${agent.name} ${effort} profile from ${profilePath}: ${message}`);
 	}
 
 	const systemPrompt = [agent.systemPrompt.trimEnd(), profilePrompt.trim()].filter(Boolean).join("\n\n");
@@ -516,7 +521,7 @@ async function runSingleAgent(
 }
 
 const WorkerEffortSchema = StringEnum(WORKER_EFFORTS, {
-	description: 'Reasoning effort for the "worker" agent. Defaults to "medium" when agent is "worker".',
+	description: 'Reasoning effort for "worker-lite" or "worker". Defaults to "medium" for either agent.',
 	default: "medium",
 });
 
@@ -559,7 +564,8 @@ export default function (pi: ExtensionAPI) {
 		description: [
 			"Delegate tasks to specialized subagents with isolated context.",
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
-			'For agent "worker", set optional effort to "medium", "high", or "xhigh"; if omitted, worker defaults to "medium" and lazily loads that worker profile.',
+			'Choose "worker-lite" for straightforward, bounded, low-risk implementation and "worker" for complex, broad, ambiguous, or high-risk work.',
+			'For either implementation agent, set effort to "medium", "high", or "xhigh" independently of the agent choice; it defaults to "medium" and lazily loads the matching profile.',
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
 		].join(" "),

@@ -124,6 +124,13 @@ persists in the live Pi agent directory under
 `~/.pi/agent/extensions/fast-mode/config.json`. This avoids fake priority model
 aliases, so `/compact` can call a real Codex model id.
 
+Pi's subagent extension provides two implementation tiers. `worker-lite` uses
+`openai-codex/gpt-5.6-terra` for straightforward, bounded, low-risk work, while
+`worker` uses `openai-codex/gpt-5.6-sol` for complex, broad, ambiguous, or
+high-risk work. Both accept `effort: medium|high|xhigh`, so model tier and
+reasoning intensity can be selected independently. The `/implement` and
+`/implement-and-review` workflows include guidance for choosing both.
+
 Install Tailscale separately, then authenticate:
 
 ```sh
