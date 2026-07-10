@@ -5,6 +5,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 
 const APP_NAME = "pi"
 const TURN_DONE_MESSAGE = "Turn completed"
+const QUESTIONNAIRE_MESSAGE = "Question waiting"
 const SUPPRESS_AGENT_END_NOTIFY_ENV = "PI_SUPPRESS_AGENT_END_NOTIFY"
 const COOLDOWN_MS = 5000
 const LINUX_ICON = "/usr/share/icons/Yaru/256x256/apps/terminal-app.png"
@@ -158,15 +159,24 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  pi.on("agent_end", () => {
-    if (process.env[SUPPRESS_AGENT_END_NOTIFY_ENV] === "1") return
-    if (!shouldNotify("agent_end")) return
+  const scheduleNotification = (key: string, message: string) => {
+    if (!shouldNotify(key)) return
 
     setImmediate(() => {
-      void notify(TURN_DONE_MESSAGE).catch((error) => {
-        const message = error instanceof Error ? error.message : String(error)
-        console.error(`[notify] notification failed: ${message}`)
+      void notify(message).catch((error) => {
+        const details = error instanceof Error ? error.message : String(error)
+        console.error(`[notify] notification failed: ${details}`)
       })
     })
+  }
+
+  pi.on("tool_execution_start", (event, ctx) => {
+    if (event.toolName !== "questionnaire" || ctx.mode !== "tui") return
+    scheduleNotification("questionnaire", QUESTIONNAIRE_MESSAGE)
+  })
+
+  pi.on("agent_end", () => {
+    if (process.env[SUPPRESS_AGENT_END_NOTIFY_ENV] === "1") return
+    scheduleNotification("agent_end", TURN_DONE_MESSAGE)
   })
 }
