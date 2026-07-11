@@ -34,6 +34,9 @@ const IMPLEMENTATION_AGENT_NAMES = ["worker-lite", "worker"] as const;
 const IMPLEMENTATION_AGENT_NAME_SET = new Set<string>(IMPLEMENTATION_AGENT_NAMES);
 const WORKER_EFFORTS = ["medium", "high", "xhigh"] as const;
 type WorkerEffort = (typeof WORKER_EFFORTS)[number];
+const PR_REVIEWER_THINKING_LEVELS = ["xhigh", "max"] as const;
+type PrReviewerThinking = (typeof PR_REVIEWER_THINKING_LEVELS)[number];
+type RuntimeThinkingLevel = WorkerEffort | PrReviewerThinking;
 const THINKING_SUFFIX_RE = /:(off|minimal|low|medium|high|xhigh)$/;
 
 const MAX_PARALLEL_TASKS = 8;
@@ -88,13 +91,13 @@ function getDisplayEffort(agentName: string, effort: unknown): WorkerEffort | un
 	return isWorkerEffort(effort) ? effort : "medium";
 }
 
-function formatAgentLabel(agentName: string, effort?: WorkerEffort): string {
-	return effort ? `${agentName}:${effort}` : agentName;
+function formatAgentLabel(agentName: string, reasoningLevel?: RuntimeThinkingLevel): string {
+	return reasoningLevel ? `${agentName}:${reasoningLevel}` : agentName;
 }
 
-function modelWithThinkingLevel(model: string | undefined, effort: WorkerEffort): string | undefined {
+function modelWithThinkingLevel(model: string | undefined, thinking: WorkerEffort): string | undefined {
 	if (!model) return model;
-	return `${model.replace(THINKING_SUFFIX_RE, "")}:${effort}`;
+	return `${model.replace(THINKING_SUFFIX_RE, "")}:${thinking}`;
 }
 
 function formatToolCall(
@@ -185,6 +188,7 @@ interface SingleResult {
 	usage: UsageStats;
 	model?: string;
 	effort?: WorkerEffort;
+	thinking?: PrReviewerThinking;
 	profilePath?: string;
 	stopReason?: string;
 	errorMessage?: string;
@@ -281,15 +285,30 @@ interface AgentRuntime {
 	model?: string;
 	systemPrompt: string;
 	effort?: WorkerEffort;
+	thinking?: PrReviewerThinking;
 	profilePath?: string;
 }
 
-function resolveAgentRuntime(agent: AgentConfig, requestedEffort: WorkerEffort | undefined): AgentRuntime {
+function resolveAgentRuntime(
+	agent: AgentConfig,
+	requestedEffort: WorkerEffort | undefined,
+	requestedThinking: PrReviewerThinking | undefined,
+): AgentRuntime {
+	if (requestedThinking && agent.name !== "pr-reviewer") {
+		throw new Error('The thinking parameter is only supported for "pr-reviewer".');
+	}
 	if (!isImplementationAgent(agent.name)) {
 		if (requestedEffort) {
 			throw new Error(`The effort parameter is only supported for: ${IMPLEMENTATION_AGENT_NAMES.join(", ")}.`);
 		}
-		return { model: agent.model, systemPrompt: agent.systemPrompt };
+		return {
+			model: agent.model,
+			systemPrompt: agent.systemPrompt,
+			thinking: requestedThinking,
+		};
+	}
+	if (requestedThinking) {
+		throw new Error('The thinking parameter cannot be combined with implementation-agent effort.');
 	}
 
 	const effort = requestedEffort ?? "medium";
@@ -335,6 +354,7 @@ async function runSingleAgent(
 	agentName: string,
 	task: string,
 	effort: WorkerEffort | undefined,
+	thinking: PrReviewerThinking | undefined,
 	cwd: string | undefined,
 	step: number | undefined,
 	signal: AbortSignal | undefined,
@@ -359,7 +379,7 @@ async function runSingleAgent(
 
 	let runtime: AgentRuntime;
 	try {
-		runtime = resolveAgentRuntime(agent, effort);
+		runtime = resolveAgentRuntime(agent, effort, thinking);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		return {
@@ -372,6 +392,7 @@ async function runSingleAgent(
 			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
 			model: agent.model,
 			effort,
+			thinking,
 			errorMessage: message,
 			step,
 		};
@@ -384,6 +405,7 @@ async function runSingleAgent(
 		args.push("--no-context-files", "--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates");
 	}
 	if (runtime.model) args.push("--model", runtime.model);
+	if (runtime.thinking) args.push("--thinking", runtime.thinking);
 	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
 
 	let tmpPromptDir: string | null = null;
@@ -399,6 +421,7 @@ async function runSingleAgent(
 		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
 		model: runtime.model,
 		effort: runtime.effort,
+		thinking: runtime.thinking,
 		profilePath: runtime.profilePath,
 		step,
 	};
@@ -530,6 +553,10 @@ const WorkerEffortSchema = StringEnum(WORKER_EFFORTS, {
 	default: "medium",
 });
 
+const PrReviewerThinkingSchema = StringEnum(PR_REVIEWER_THINKING_LEVELS, {
+	description: 'Thinking level override for "pr-reviewer" in single mode. Its configured default is "xhigh".',
+});
+
 const TaskItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task to delegate to the agent" }),
@@ -553,6 +580,7 @@ const SubagentParams = Type.Object({
 	agent: Type.Optional(Type.String({ description: "Name of the agent to invoke (for single mode)" })),
 	task: Type.Optional(Type.String({ description: "Task to delegate (for single mode)" })),
 	effort: Type.Optional(WorkerEffortSchema),
+	thinking: Type.Optional(PrReviewerThinkingSchema),
 	tasks: Type.Optional(Type.Array(TaskItem, { description: "Array of {agent, task, optional effort} for parallel execution" })),
 	chain: Type.Optional(Type.Array(ChainItem, { description: "Array of {agent, task, optional effort} for sequential execution" })),
 	agentScope: Type.Optional(AgentScopeSchema),
@@ -571,6 +599,7 @@ export default function (pi: ExtensionAPI) {
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
 			'Choose "worker-lite" for straightforward, bounded, low-risk implementation and "worker" for complex, broad, ambiguous, or high-risk work.',
 			'For either implementation agent, set effort to "medium", "high", or "xhigh" independently of the agent choice; it defaults to "medium" and lazily loads the matching profile.',
+			'For "pr-reviewer", optionally set thinking to "xhigh" or "max"; without it the agent model configuration is used.',
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
 		].join(" "),
@@ -595,6 +624,14 @@ export default function (pi: ExtensionAPI) {
 					projectAgentsDir: discovery.projectAgentsDir,
 					results,
 				});
+
+			if (params.thinking && !hasSingle) {
+				return {
+					content: [{ type: "text", text: "The thinking parameter is only supported in single mode." }],
+					details: makeDetails(hasChain ? "chain" : hasTasks ? "parallel" : "single")([]),
+					isError: true,
+				};
+			}
 
 			if (modeCount !== 1) {
 				const available = agents.map((a) => `${a.name} (${a.source})`).join(", ") || "none";
@@ -663,6 +700,7 @@ export default function (pi: ExtensionAPI) {
 						step.agent,
 						taskWithContext,
 						step.effort,
+						undefined,
 						step.cwd,
 						i + 1,
 						signal,
@@ -737,6 +775,7 @@ export default function (pi: ExtensionAPI) {
 						t.agent,
 						t.task,
 						t.effort,
+						undefined,
 						t.cwd,
 						undefined,
 						signal,
@@ -760,7 +799,7 @@ export default function (pi: ExtensionAPI) {
 					const status = isFailedResult(r)
 						? `failed${r.stopReason && r.stopReason !== "end" ? ` (${r.stopReason})` : ""}`
 						: "completed";
-					return `### [${formatAgentLabel(r.agent, r.effort)}] ${status}\n\n${output}`;
+					return `### [${formatAgentLabel(r.agent, r.effort ?? r.thinking)}] ${status}\n\n${output}`;
 				});
 				return {
 					content: [
@@ -780,6 +819,7 @@ export default function (pi: ExtensionAPI) {
 					params.agent,
 					params.task,
 					params.effort,
+					params.thinking,
 					params.cwd,
 					undefined,
 					signal,
@@ -845,7 +885,7 @@ export default function (pi: ExtensionAPI) {
 				return new Text(text, 0, 0);
 			}
 			const agentName = args.agent || "...";
-			const agentLabel = formatAgentLabel(agentName, getDisplayEffort(agentName, args.effort));
+			const agentLabel = formatAgentLabel(agentName, getDisplayEffort(agentName, args.effort) ?? args.thinking);
 			const preview = args.task ? (args.task.length > 60 ? `${args.task.slice(0, 60)}...` : args.task) : "...";
 			let text =
 				theme.fg("toolTitle", theme.bold("subagent ")) +
@@ -889,7 +929,7 @@ export default function (pi: ExtensionAPI) {
 
 				if (expanded) {
 					const container = new Container();
-					let header = `${icon} ${theme.fg("toolTitle", theme.bold(formatAgentLabel(r.agent, r.effort)))}${theme.fg("muted", ` (${r.agentSource})`)}`;
+					let header = `${icon} ${theme.fg("toolTitle", theme.bold(formatAgentLabel(r.agent, r.effort ?? r.thinking)))}${theme.fg("muted", ` (${r.agentSource})`)}`;
 					if (isError && r.stopReason) header += ` ${theme.fg("error", `[${r.stopReason}]`)}`;
 					container.addChild(new Text(header, 0, 0));
 					if (isError && r.errorMessage)
@@ -925,7 +965,7 @@ export default function (pi: ExtensionAPI) {
 					return container;
 				}
 
-				let text = `${icon} ${theme.fg("toolTitle", theme.bold(formatAgentLabel(r.agent, r.effort)))}${theme.fg("muted", ` (${r.agentSource})`)}`;
+				let text = `${icon} ${theme.fg("toolTitle", theme.bold(formatAgentLabel(r.agent, r.effort ?? r.thinking)))}${theme.fg("muted", ` (${r.agentSource})`)}`;
 				if (isError && r.stopReason) text += ` ${theme.fg("error", `[${r.stopReason}]`)}`;
 				if (isError && r.errorMessage) text += `\n${theme.fg("error", `Error: ${r.errorMessage}`)}`;
 				else if (displayItems.length === 0) text += `\n${theme.fg("muted", "(no output)")}`;
