@@ -86,6 +86,68 @@ the helper runs the equivalent of:
 swaymsg '[class="open-whispr"] focus'
 ```
 
+## Obsidian AppImage on Linux
+
+Obsidian is installed separately; do not add its AppImage or extracted icon to
+this repository. The managed `~/.local/bin/obsidian` helper and desktop entry
+expect the AppImage at `~/Applications/Obsidian.AppImage`.
+
+Download the current official GitHub release for this machine's architecture:
+
+```sh
+mkdir -p ~/Applications
+case "$(uname -m)" in
+  x86_64) obsidian_arch=x86_64 ;;
+  aarch64|arm64) obsidian_arch=arm64 ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+url="$(curl -fsSL https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest \
+  | jq -r --arg arch "$obsidian_arch" '
+      .assets[]
+      | select(.name | endswith(".AppImage"))
+      | select(if $arch == "arm64" then (.name | contains("arm64")) else (.name | contains("arm64") | not) end)
+      | .browser_download_url' \
+  | head -n1)"
+test -n "$url" && test "$url" != "null"
+curl -fL "$url" -o ~/Applications/Obsidian.AppImage
+chmod 755 ~/Applications/Obsidian.AppImage
+```
+
+Extract the bundled icon once so the application launcher can display it:
+
+```sh
+workdir="$(mktemp -d)"
+(
+  cd "$workdir"
+  ~/Applications/Obsidian.AppImage --appimage-extract >/dev/null
+)
+install -Dm644 "$workdir/squashfs-root/usr/share/icons/hicolor/512x512/apps/obsidian.png" \
+  ~/.local/share/icons/hicolor/512x512/apps/obsidian.png
+rm -rf "$workdir"
+```
+
+Run `chezmoi apply` after pulling these dotfiles to deploy the `obsidian`
+helper and `~/.local/share/applications/obsidian.desktop` launcher. Launch it
+from the application menu or with:
+
+```sh
+obsidian
+```
+
+The AppImage currently requires `--no-sandbox` on this machine because its
+Chromium SUID sandbox cannot be configured from the mounted AppImage. The
+managed helper supplies that flag. This disables Chromium's sandbox, so only
+install AppImages from Obsidian's official release repository and keep
+third-party plugins to ones you trust.
+
+Replacing `~/Applications/Obsidian.AppImage` with a newer release updates
+Obsidian; the helper, desktop entry, and extracted icon can remain in place.
+On sway, `obsidian` focuses an existing window. If needed, focus it manually:
+
+```sh
+swaymsg '[app_id="obsidian"] focus'
+```
+
 ## Pi Settings and Chezmoi Sync
 
 Pi treats `~/.pi/agent/settings.json` as live application state. Commands such

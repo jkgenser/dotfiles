@@ -1,0 +1,45 @@
+#!/usr/bin/env sh
+# Launch Obsidian's AppImage or focus its existing window on sway/i3.
+
+set -eu
+
+if [ "$(uname -s)" != "Linux" ]; then
+  echo "obsidian: Linux-only helper" >&2
+  exit 1
+fi
+
+appimage="${OBSIDIAN_APPIMAGE:-$HOME/Applications/Obsidian.AppImage}"
+if [ ! -x "$appimage" ]; then
+  echo "obsidian: AppImage not found at $appimage" >&2
+  echo "Install it as documented in ~/.local/share/chezmoi/README.md" >&2
+  exit 127
+fi
+
+is_running() {
+  pgrep -x obsidian >/dev/null 2>&1
+}
+
+focus_obsidian() {
+  if [ -n "${SWAYSOCK:-}" ] && command -v swaymsg >/dev/null 2>&1; then
+    swaymsg '[app_id="obsidian"] focus' >/dev/null 2>&1 && return 0
+  fi
+
+  if [ -n "${I3SOCK:-}" ] && command -v i3-msg >/dev/null 2>&1; then
+    i3-msg '[class="obsidian"] focus' >/dev/null 2>&1 && return 0
+  fi
+
+  return 1
+}
+
+if is_running; then
+  focus_obsidian || true
+  exit 0
+fi
+
+log_dir="${XDG_CACHE_HOME:-$HOME/.cache}/obsidian"
+mkdir -p "$log_dir"
+nohup "$appimage" --no-sandbox "$@" >"$log_dir/launcher.log" 2>&1 &
+
+# Give Electron a moment to create its window before focusing it on sway/i3.
+sleep 1
+focus_obsidian || true
