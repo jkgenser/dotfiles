@@ -378,6 +378,11 @@ async function runSingleAgent(
 	}
 
 	const args: string[] = ["--mode", "json", "-p", "--no-session", "--exclude-tools", "subagent"];
+	if (agentName === "pr-reviewer") {
+		// Reviews may inspect untrusted PRs. Do not load instructions or executable
+		// resources from the reviewed worktree into the child Pi process.
+		args.push("--no-context-files", "--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates");
+	}
 	if (runtime.model) args.push("--model", runtime.model);
 	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
 

@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  pi-review-worktree create <PR-number-or-URL>
+  pi-review-worktree cleanup <review-root-or-worktree-path>
+
+Creates an isolated detached worktree for a pull request in the current
+repository. Commands print a JSON result to stdout; diagnostics go to stderr.
+EOF
+}
+
+fail() {
+  printf 'pi-review-worktree: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
+}
+
+canonical_path() {
+  realpath -m -- "$1"
+}
+
+worktree_registered() {
+  local repo_root=$1
+  local worktree=$2
+  git -C "$repo_root" worktree list --porcelain 2>/dev/null | grep -Fqx "worktree $worktree"
+}
+
+materialize_tree() {
+  local repo_root=$1
+  local worktree=$2
+  local commit=$3
+
+  # Read blobs directly from Git instead of running checkout. This avoids hooks,
+  # clean/smudge/process filters, and submodule initialization. Symlinks are
+  # represented as plain files containing their target to prevent path escape.
+  git -C "$repo_root" ls-tree -rz --full-tree "$commit" |
+    while IFS= read -r -d '' entry; do
+      local object_info relative mode object_type object_id destination parent
+      object_info=${entry%%$'\t'*}
+      relative=${entry#*$'\t'}
+      read -r mode object_type object_id <<<"$object_info"
+
+      [[ "$relative" != /* && "$relative" != ".." && "$relative" != ../* && "$relative" != */../* ]] ||
+        fail "refusing unsafe tree path: $relative"
+      destination="$worktree/$relative"
+      parent=$(dirname "$destination")
+      mkdir -p -- "$parent"
+
+      case "$mode:$object_type" in
+        100755:blob)
+          git -C "$repo_root" cat-file blob "$object_id" >"$destination"
+          chmod 0755 "$destination"
+          ;;
+        100*:blob|120000:blob)
+          git -C "$repo_root" cat-file blob "$object_id" >"$destination"
+          chmod 0644 "$destination"
+          ;;
+        160000:commit)
+          mkdir -p -- "$destination"
+          ;;
+        *)
+          fail "unsupported Git tree entry ($mode $object_type): $relative"
+          ;;
+      esac
+    done
+}
+
+create_review() {
+  local pr_ref=${1:-}
+  [[ -n "$pr_ref" ]] || fail "create requires a PR number or URL"
+
+  require_command git
+  require_command gh
+  require_command grep
+  require_command jq
+  require_command mktemp
+  require_command realpath
+
+  local repo_root repo_json repo_url pr_json pr_url
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
+  repo_json=$(gh repo view --json nameWithOwner,url) || fail "could not resolve the current GitHub repository"
+  repo_url=$(jq -er '.url' <<<"$repo_json") || fail "gh returned repository metadata without a URL"
+  pr_json=$(gh pr view "$pr_ref" --json number,url,title,body,baseRefName,baseRefOid,headRefName,headRefOid,isCrossRepository,author) ||
+    fail "could not resolve pull request: $pr_ref"
+  pr_url=$(jq -er '.url' <<<"$pr_json") || fail "gh returned PR metadata without a URL"
+
+  case "$pr_url" in
+    "$repo_url"/pull/*) ;;
+    *) fail "PR belongs to a different repository (current: $repo_url, PR: $pr_url)" ;;
+  esac
+
+  local review_root worktree metadata diff_file created_at
+  review_root=$(mktemp -d "${TMPDIR:-/tmp}/pi-review.XXXXXXXX")
+  worktree="$review_root/worktree"
+  metadata="$review_root/metadata.json"
+  diff_file="$review_root/review.diff"
+  created_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+  local worktree_added=0
+  cleanup_failed_create() {
+    local status=$?
+    [[ $status -ne 0 ]] || status=1
+    trap - EXIT INT TERM
+    if [[ $worktree_added -eq 1 ]] && ! git -C "$repo_root" worktree remove --force "$worktree" >/dev/null 2>&1; then
+      if worktree_registered "$repo_root" "$worktree"; then
+        printf 'pi-review-worktree: failed setup left a registered worktree at %s\n' "$worktree" >&2
+        exit "$status"
+      fi
+    fi
+    rm -rf -- "$review_root"
+    exit "$status"
+  }
+  trap cleanup_failed_create EXIT INT TERM
+
+  local pr_number expected_head fetched_head base_ref base_oid merge_base
+  pr_number=$(jq -er '.number' <<<"$pr_json")
+  expected_head=$(jq -er '.headRefOid' <<<"$pr_json")
+  base_ref=$(jq -er '.baseRefName' <<<"$pr_json")
+  base_oid=$(jq -er '.baseRefOid' <<<"$pr_json")
+
+  # Fetch objects without checking out PR-controlled content.
+  git -C "$repo_root" fetch --quiet --no-tags "$repo_url" "refs/pull/$pr_number/head"
+  fetched_head=$(git -C "$repo_root" rev-parse FETCH_HEAD)
+  [[ "$fetched_head" == "$expected_head" ]] ||
+    fail "PR changed during setup (expected head $expected_head, fetched $fetched_head); retry the review"
+  git -C "$repo_root" fetch --quiet --no-tags "$repo_url" "refs/heads/$base_ref"
+
+  git -C "$repo_root" cat-file -e "${base_oid}^{commit}" 2>/dev/null ||
+    fail "could not fetch the recorded base commit $base_oid"
+  merge_base=$(git -C "$repo_root" merge-base "$base_oid" "$expected_head" 2>/dev/null) ||
+    fail "could not resolve a merge base; the repository may need additional history"
+  [[ -n "$merge_base" ]] || fail "the PR base and head have no merge base"
+
+  # Register a detached worktree without invoking checkout machinery, then
+  # materialize blobs directly. No hooks, filters, submodules, or PR code run.
+  git -C "$repo_root" worktree add --quiet --detach --no-checkout "$worktree" "$expected_head"
+  worktree_added=1
+  materialize_tree "$repo_root" "$worktree" "$expected_head"
+  git -C "$repo_root" diff --no-ext-diff --no-textconv --find-renames "$base_oid...$expected_head" >"$diff_file"
+
+  jq -n \
+    --arg schemaVersion "1" \
+    --arg reviewRoot "$review_root" \
+    --arg worktree "$worktree" \
+    --arg diffFile "$diff_file" \
+    --arg repositoryRoot "$repo_root" \
+    --arg repositoryUrl "$repo_url" \
+    --arg createdAt "$created_at" \
+    --argjson pullRequest "$pr_json" \
+    '{
+      schemaVersion: ($schemaVersion | tonumber),
+      reviewRoot: $reviewRoot,
+      worktree: $worktree,
+      diffFile: $diffFile,
+      repositoryRoot: $repositoryRoot,
+      repositoryUrl: $repositoryUrl,
+      createdAt: $createdAt,
+      pullRequest: $pullRequest,
+      diffRange: ($pullRequest.baseRefOid + "..." + $pullRequest.headRefOid),
+      materializationMode: "git-objects-no-hooks-or-filters"
+    }' >"$metadata"
+
+  trap - EXIT INT TERM
+  cat "$metadata"
+}
+
+cleanup_review() {
+  local supplied=${1:-}
+  [[ -n "$supplied" ]] || fail "cleanup requires a review root or worktree path"
+
+  require_command git
+  require_command grep
+  require_command jq
+  require_command realpath
+
+  local candidate review_root metadata
+  candidate=$(canonical_path "$supplied")
+  if [[ -f "$candidate/metadata.json" ]]; then
+    review_root=$candidate
+  elif [[ $(basename "$candidate") == "worktree" && -f "$(dirname "$candidate")/metadata.json" ]]; then
+    review_root=$(dirname "$candidate")
+  else
+    fail "not a pi review directory: $supplied"
+  fi
+
+  metadata="$review_root/metadata.json"
+  local recorded_root worktree repo_root temp_base
+  recorded_root=$(jq -er '.reviewRoot' "$metadata") || fail "invalid review metadata: missing reviewRoot"
+  worktree=$(jq -er '.worktree' "$metadata") || fail "invalid review metadata: missing worktree"
+  repo_root=$(jq -er '.repositoryRoot' "$metadata") || fail "invalid review metadata: missing repositoryRoot"
+
+  recorded_root=$(canonical_path "$recorded_root")
+  worktree=$(canonical_path "$worktree")
+  repo_root=$(canonical_path "$repo_root")
+  temp_base=$(canonical_path "${TMPDIR:-/tmp}")
+
+  [[ "$recorded_root" == "$review_root" ]] || fail "review metadata path does not match its directory"
+  [[ "$worktree" == "$review_root/worktree" ]] || fail "review metadata contains an unexpected worktree path"
+  [[ "$review_root" == "$temp_base"/pi-review.* ]] || fail "refusing to remove review directory outside $temp_base"
+
+  if git -C "$repo_root" rev-parse --git-dir >/dev/null 2>&1; then
+    if ! git -C "$repo_root" worktree remove --force "$worktree" >/dev/null 2>&1; then
+      if [[ -e "$worktree" ]] || worktree_registered "$repo_root" "$worktree"; then
+        fail "could not fully remove worktree: $worktree"
+      fi
+    fi
+  else
+    fail "original repository is no longer available: $repo_root"
+  fi
+
+  rm -rf -- "$review_root"
+  jq -n --arg reviewRoot "$review_root" '{cleaned: true, reviewRoot: $reviewRoot}'
+}
+
+case ${1:-} in
+  create)
+    shift
+    [[ $# -eq 1 ]] || { usage; exit 2; }
+    create_review "$1"
+    ;;
+  cleanup)
+    shift
+    [[ $# -eq 1 ]] || { usage; exit 2; }
+    cleanup_review "$1"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
