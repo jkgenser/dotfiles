@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Read-only code review specialist for correctness and security analysis
+description: Read-only reviewer reserved for explicit user requests or exceptionally high-risk security, concurrency, migration, data-integrity, or public-API changes; do not use for routine implementations
 tools: read, grep, find, ls, bash
 model: openai-codex/gpt-5.6-sol:xhigh
 ---

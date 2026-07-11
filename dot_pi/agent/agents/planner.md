@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Creates implementation plans from context and requirements
+description: Planning specialist reserved for explicit user requests or exceptionally complex architectural, cross-system, ambiguous, or high-risk changes; handle ordinary planning directly
 tools: read, grep, find, ls
 model: openai-codex/gpt-5.6-sol:xhigh
 ---

@@ -596,6 +596,8 @@ export default function (pi: ExtensionAPI) {
 		label: "Subagent",
 		description: [
 			"Delegate tasks to specialized subagents with isolated context.",
+			"Handle ordinary tasks directly; do not delegate merely because a task is multi-file or nontrivial.",
+			'Use "planner" or "reviewer" only when the user explicitly requests one or the work is exceptionally complex or high-risk. When uncertain, do not use them.',
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
 			'Choose "worker-lite" for straightforward, bounded, low-risk implementation and "worker" for complex, broad, ambiguous, or high-risk work.',
 			'For either implementation agent, set effort to "medium", "high", or "xhigh" independently of the agent choice; it defaults to "medium" and lazily loads the matching profile.',
