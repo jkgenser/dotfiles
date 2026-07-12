@@ -14,5 +14,10 @@
     "google-vertex/gemini-3.5-flash"
   ],
   "lastChangelogVersion": "0.80.5",
+  "tokenSpeed": {
+    "windowMs": 1000,
+    "showTtft": true,
+    "showFinalAverage": true
+  },
   "packages": []
 }

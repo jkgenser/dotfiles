@@ -186,6 +186,21 @@ persists in the live Pi agent directory under
 `~/.pi/agent/extensions/fast-mode/config.json`. This avoids fake priority model
 aliases, so `/compact` can call a real Codex model id.
 
+## Pi Token Speed
+
+The local extension at `dot_pi/agent/extensions/token-speed.ts` displays live
+model throughput and time-to-first-token in Pi's footer. Live throughput uses
+Pi's tokenizer-free `chars / 4` estimate and is marked with `~`; once a response
+finishes, the extension reconciles the average against the provider-reported
+output-token count. Tool execution time is excluded because each provider
+response is measured independently.
+
+The implementation was inspired by Gabriel Sanhueza's MIT-licensed
+[`pi-token-speed`](https://github.com/gsanhueza/pi-token-speed), reviewed at
+v0.7.0 (commit `75e0aca`), but is independently implemented and does not vendor
+that package's source. Defaults live under `tokenSpeed` in
+`dot_pi/agent/settings.json`.
+
 Pi's subagent extension provides two implementation tiers. `worker-lite` uses
 `openai-codex/gpt-5.6-terra` for straightforward, bounded, low-risk work, while
 `worker` uses `openai-codex/gpt-5.6-sol` for complex, broad, ambiguous, or
