@@ -201,12 +201,20 @@ v0.7.0 (commit `75e0aca`), but is independently implemented and does not vendor
 that package's source. Defaults live under `tokenSpeed` in
 `dot_pi/agent/settings.json`.
 
-Pi's subagent extension provides two implementation tiers. `worker-lite` uses
-`openai-codex/gpt-5.6-terra` for straightforward, bounded, low-risk work, while
-`worker` uses `openai-codex/gpt-5.6-sol` for complex, broad, ambiguous, or
-high-risk work. Both accept `effort: medium|high|xhigh`, so model tier and
-reasoning intensity can be selected independently. The `/implement` and
-`/implement-and-review` workflows include guidance for choosing both.
+Pi's subagent extension provides three implementation tiers. `worker-lite` uses
+`openai-codex/gpt-5.6-luna` for straightforward, bounded, low-risk work;
+`worker` uses `openai-codex/gpt-5.6-terra` for nontrivial or moderately risky
+work; and `worker-max` uses `openai-codex/gpt-5.6-sol` for the broadest, most
+ambiguous, or highest-risk work. `worker-lite` accepts
+`effort: high|xhigh|max` and defaults to `high`; `worker` and `worker-max`
+accept `effort: medium|high|xhigh` and default to `medium`. Model tier and
+reasoning intensity can therefore be selected independently.
+
+For static review, `reviewer-lite` uses `openai-codex/gpt-5.6-luna:xhigh` for
+focused, bounded, low-risk review requests, while `reviewer` retains
+`openai-codex/gpt-5.6-sol:xhigh` for broad, complex, or high-risk review. The
+isolated pull-request workflow continues to use the separately hardened
+`pr-reviewer` agent.
 
 Install Tailscale separately, then authenticate:
 

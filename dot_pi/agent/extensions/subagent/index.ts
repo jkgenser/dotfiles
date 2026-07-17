@@ -30,14 +30,24 @@ import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
-const IMPLEMENTATION_AGENT_NAMES = ["worker-lite", "worker"] as const;
+const IMPLEMENTATION_AGENT_NAMES = ["worker-lite", "worker", "worker-max"] as const;
+type ImplementationAgentName = (typeof IMPLEMENTATION_AGENT_NAMES)[number];
 const IMPLEMENTATION_AGENT_NAME_SET = new Set<string>(IMPLEMENTATION_AGENT_NAMES);
-const WORKER_EFFORTS = ["medium", "high", "xhigh"] as const;
+const WORKER_EFFORTS = ["medium", "high", "xhigh", "max"] as const;
 type WorkerEffort = (typeof WORKER_EFFORTS)[number];
+interface WorkerEffortConfig {
+	allowed: readonly WorkerEffort[];
+	defaultEffort: WorkerEffort;
+}
+const WORKER_EFFORT_CONFIG: Record<ImplementationAgentName, WorkerEffortConfig> = {
+	"worker-lite": { allowed: ["high", "xhigh", "max"], defaultEffort: "high" },
+	worker: { allowed: ["medium", "high", "xhigh"], defaultEffort: "medium" },
+	"worker-max": { allowed: ["medium", "high", "xhigh"], defaultEffort: "medium" },
+};
 const PR_REVIEWER_THINKING_LEVELS = ["xhigh", "max"] as const;
 type PrReviewerThinking = (typeof PR_REVIEWER_THINKING_LEVELS)[number];
 type RuntimeThinkingLevel = WorkerEffort | PrReviewerThinking;
-const THINKING_SUFFIX_RE = /:(off|minimal|low|medium|high|xhigh)$/;
+const THINKING_SUFFIX_RE = /:(off|minimal|low|medium|high|xhigh|max)$/;
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
@@ -82,13 +92,13 @@ function isWorkerEffort(value: unknown): value is WorkerEffort {
 	return WORKER_EFFORTS.includes(value as WorkerEffort);
 }
 
-function isImplementationAgent(agentName: string): boolean {
+function isImplementationAgent(agentName: string): agentName is ImplementationAgentName {
 	return IMPLEMENTATION_AGENT_NAME_SET.has(agentName);
 }
 
 function getDisplayEffort(agentName: string, effort: unknown): WorkerEffort | undefined {
 	if (!isImplementationAgent(agentName)) return undefined;
-	return isWorkerEffort(effort) ? effort : "medium";
+	return isWorkerEffort(effort) ? effort : WORKER_EFFORT_CONFIG[agentName].defaultEffort;
 }
 
 function formatAgentLabel(agentName: string, reasoningLevel?: RuntimeThinkingLevel): string {
@@ -311,7 +321,13 @@ function resolveAgentRuntime(
 		throw new Error('The thinking parameter cannot be combined with implementation-agent effort.');
 	}
 
-	const effort = requestedEffort ?? "medium";
+	const effortConfig = WORKER_EFFORT_CONFIG[agent.name];
+	const effort = requestedEffort ?? effortConfig.defaultEffort;
+	if (!effortConfig.allowed.includes(effort)) {
+		throw new Error(
+			`The effort parameter for "${agent.name}" must be one of: ${effortConfig.allowed.join(", ")}.`,
+		);
+	}
 	const profilePath = path.join(path.dirname(agent.filePath), "worker-profiles", `${effort}.md`);
 	let profilePrompt: string;
 	try {
@@ -549,8 +565,8 @@ async function runSingleAgent(
 }
 
 const WorkerEffortSchema = StringEnum(WORKER_EFFORTS, {
-	description: 'Reasoning effort for "worker-lite" or "worker". Defaults to "medium" for either agent.',
-	default: "medium",
+	description:
+		'Reasoning effort for implementation agents. "worker-lite" accepts high/xhigh/max (default high); "worker" and "worker-max" accept medium/high/xhigh (default medium).',
 });
 
 const PrReviewerThinkingSchema = StringEnum(PR_REVIEWER_THINKING_LEVELS, {
@@ -597,10 +613,11 @@ export default function (pi: ExtensionAPI) {
 		description: [
 			"Delegate tasks to specialized subagents with isolated context.",
 			"Handle ordinary tasks directly; do not delegate merely because a task is multi-file or nontrivial.",
-			'Use "planner" or "reviewer" only when the user explicitly requests one or the work is exceptionally complex or high-risk. When uncertain, do not use them.',
+			'Use "planner", "reviewer-lite", or "reviewer" only when the user explicitly requests one or the work is exceptionally complex or high-risk. When uncertain, do not use them.',
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
-			'Choose "worker-lite" for straightforward, bounded, low-risk implementation and "worker" for complex, broad, ambiguous, or high-risk work.',
-			'For either implementation agent, set effort to "medium", "high", or "xhigh" independently of the agent choice; it defaults to "medium" and lazily loads the matching profile.',
+			'For explicit reviews, choose "reviewer-lite" for focused, bounded, low-risk changes and "reviewer" for broad, complex, or high-risk changes.',
+			'Choose "worker-lite" for straightforward, bounded, low-risk implementation, "worker" for nontrivial or moderately risky work, and "worker-max" for the broadest, most ambiguous, or highest-risk work.',
+			'Choose reasoning effort independently of model tier: "worker-lite" accepts "high", "xhigh", or "max" (default "high"), while "worker" and "worker-max" accept "medium", "high", or "xhigh" (default "medium"); profiles load lazily.',
 			'For "pr-reviewer", optionally set thinking to "xhigh" or "max"; without it the agent model configuration is used.',
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
