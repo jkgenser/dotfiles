@@ -6,6 +6,8 @@ HISTORY_IGNORE="export*"
 setopt APPEND_HISTORY
 setopt SHARE_HISTORY
 
+autoload -Uz compinit && compinit
+
 alias tf='terraform'
 alias z='zellij'
 alias oc='opencode'
