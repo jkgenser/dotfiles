@@ -30,6 +30,11 @@ import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
+const WORKER_EFFORTS = ["medium", "high", "xhigh", "max"] as const;
+type WorkerEffort = (typeof WORKER_EFFORTS)[number];
+const DEFAULT_WORKER_EFFORT: WorkerEffort = "max";
+const THINKING_SUFFIX_RE = /:(off|minimal|low|medium|high|xhigh|max)$/;
+
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
 const COLLAPSED_ITEM_COUNT = 10;
@@ -67,6 +72,15 @@ function formatUsageStats(
 	}
 	if (model) parts.push(model);
 	return parts.join(" ");
+}
+
+function modelWithEffort(model: string | undefined, effort: WorkerEffort): string | undefined {
+	if (!model) return model;
+	return `${model.replace(THINKING_SUFFIX_RE, "")}:${effort}`;
+}
+
+function formatAgentLabel(agentName: string, effort?: WorkerEffort): string {
+	return effort ? `${agentName}:${effort}` : agentName;
 }
 
 function formatToolCall(
@@ -156,6 +170,7 @@ interface SingleResult {
 	stderr: string;
 	usage: UsageStats;
 	model?: string;
+	effort?: WorkerEffort;
 	stopReason?: string;
 	errorMessage?: string;
 	step?: number;
@@ -270,6 +285,7 @@ async function runSingleAgent(
 	agents: AgentConfig[],
 	agentName: string,
 	task: string,
+	effort: WorkerEffort | undefined,
 	cwd: string | undefined,
 	step: number | undefined,
 	signal: AbortSignal | undefined,
@@ -292,8 +308,27 @@ async function runSingleAgent(
 		};
 	}
 
+	if (effort && agent.name !== "worker") {
+		const message = 'The effort parameter is only supported for the "worker" agent.';
+		return {
+			agent: agentName,
+			agentSource: agent.source,
+			task,
+			exitCode: 1,
+			messages: [],
+			stderr: message,
+			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
+			model: agent.model,
+			effort,
+			errorMessage: message,
+			step,
+		};
+	}
+
+	const resolvedEffort = agent.name === "worker" ? (effort ?? DEFAULT_WORKER_EFFORT) : undefined;
+	const model = resolvedEffort ? modelWithEffort(agent.model, resolvedEffort) : agent.model;
 	const args: string[] = ["--mode", "json", "-p", "--no-session", "--exclude-tools", "subagent"];
-	if (agent.model) args.push("--model", agent.model);
+	if (model) args.push("--model", model);
 	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
 
 	let tmpPromptDir: string | null = null;
@@ -307,7 +342,8 @@ async function runSingleAgent(
 		messages: [],
 		stderr: "",
 		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
-		model: agent.model,
+		model,
+		effort: resolvedEffort,
 		step,
 	};
 
@@ -433,15 +469,22 @@ async function runSingleAgent(
 	}
 }
 
+const WorkerEffortSchema = StringEnum(WORKER_EFFORTS, {
+	description:
+		'Reasoning effort for the "worker" agent. Supported values: medium, high, xhigh, max. Default: max.',
+});
+
 const TaskItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task to delegate to the agent" }),
+	effort: Type.Optional(WorkerEffortSchema),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
 });
 
 const ChainItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task with optional {previous} placeholder for prior output" }),
+	effort: Type.Optional(WorkerEffortSchema),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
 });
 
@@ -453,8 +496,13 @@ const AgentScopeSchema = StringEnum(["user", "project", "both"] as const, {
 const SubagentParams = Type.Object({
 	agent: Type.Optional(Type.String({ description: "Name of the agent to invoke (for single mode)" })),
 	task: Type.Optional(Type.String({ description: "Task to delegate (for single mode)" })),
-	tasks: Type.Optional(Type.Array(TaskItem, { description: "Array of {agent, task} for parallel execution" })),
-	chain: Type.Optional(Type.Array(ChainItem, { description: "Array of {agent, task} for sequential execution" })),
+	effort: Type.Optional(WorkerEffortSchema),
+	tasks: Type.Optional(
+		Type.Array(TaskItem, { description: "Array of {agent, task, optional effort} for parallel execution" }),
+	),
+	chain: Type.Optional(
+		Type.Array(ChainItem, { description: "Array of {agent, task, optional effort} for sequential execution" }),
+	),
 	agentScope: Type.Optional(AgentScopeSchema),
 	confirmProjectAgents: Type.Optional(
 		Type.Boolean({ description: "Prompt before running project-local agents. Default: true.", default: true }),
@@ -470,8 +518,8 @@ export default function (pi: ExtensionAPI) {
 			"Delegate implementation or codebase reconnaissance to isolated subagents.",
 			"Handle ordinary tasks and all code reviews directly in the main agent; do not delegate merely because a task is multi-file or nontrivial.",
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
-			'Use "scout" for fast codebase reconnaissance, "worker-lite" for straightforward bounded implementation, and "worker" for nontrivial or risky implementation.',
-			'"scout" uses the direct DeepSeek API at high reasoning effort; "worker-lite" uses direct DeepSeek Pro at max; "worker" uses Terra at max.',
+			'Use "scout" only for read-only static codebase reconnaissance with read/grep/find/ls; never delegate shell commands, SQL/database operations, Docker, or other infrastructure/runtime actions to it—the main agent must perform those directly. Use "worker-lite" for straightforward bounded implementation and "worker" for nontrivial or risky implementation.',
+			'"scout" uses the direct DeepSeek API at high reasoning effort; "worker-lite" uses direct DeepSeek Pro at max; "worker" uses Terra with optional effort=medium/high/xhigh/max (default max).',
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
 		].join(" "),
@@ -496,6 +544,14 @@ export default function (pi: ExtensionAPI) {
 					projectAgentsDir: discovery.projectAgentsDir,
 					results,
 				});
+
+			if (params.effort && !hasSingle) {
+				return {
+					content: [{ type: "text", text: "The top-level effort parameter is only supported in single mode." }],
+					details: makeDetails(hasChain ? "chain" : hasTasks ? "parallel" : "single")([]),
+					isError: true,
+				};
+			}
 
 			if (modeCount !== 1) {
 				const available = agents.map((a) => `${a.name} (${a.source})`).join(", ") || "none";
@@ -563,6 +619,7 @@ export default function (pi: ExtensionAPI) {
 						agents,
 						step.agent,
 						taskWithContext,
+						step.effort,
 						step.cwd,
 						i + 1,
 						signal,
@@ -613,6 +670,10 @@ export default function (pi: ExtensionAPI) {
 						messages: [],
 						stderr: "",
 						usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
+						effort:
+							params.tasks[i].agent === "worker"
+								? (params.tasks[i].effort ?? DEFAULT_WORKER_EFFORT)
+								: params.tasks[i].effort,
 					};
 				}
 
@@ -635,6 +696,7 @@ export default function (pi: ExtensionAPI) {
 						agents,
 						t.agent,
 						t.task,
+						t.effort,
 						t.cwd,
 						undefined,
 						signal,
@@ -658,7 +720,7 @@ export default function (pi: ExtensionAPI) {
 					const status = isFailedResult(r)
 						? `failed${r.stopReason && r.stopReason !== "end" ? ` (${r.stopReason})` : ""}`
 						: "completed";
-					return `### [${r.agent}] ${status}\n\n${output}`;
+					return `### [${formatAgentLabel(r.agent, r.effort)}] ${status}\n\n${output}`;
 				});
 				return {
 					content: [
@@ -677,6 +739,7 @@ export default function (pi: ExtensionAPI) {
 					agents,
 					params.agent,
 					params.task,
+					params.effort,
 					params.cwd,
 					undefined,
 					signal,
@@ -717,7 +780,10 @@ export default function (pi: ExtensionAPI) {
 					// Clean up {previous} placeholder for display
 					const cleanTask = step.task.replace(/\{previous\}/g, "").trim();
 					const preview = cleanTask.length > 40 ? `${cleanTask.slice(0, 40)}...` : cleanTask;
-					const agentLabel = step.agent;
+					const agentLabel = formatAgentLabel(
+						step.agent,
+						step.agent === "worker" ? (step.effort ?? DEFAULT_WORKER_EFFORT) : step.effort,
+					);
 					text +=
 						"\n  " +
 						theme.fg("muted", `${i + 1}.`) +
@@ -735,14 +801,20 @@ export default function (pi: ExtensionAPI) {
 					theme.fg("muted", ` [${scope}]`);
 				for (const t of args.tasks.slice(0, 3)) {
 					const preview = t.task.length > 40 ? `${t.task.slice(0, 40)}...` : t.task;
-					const agentLabel = t.agent;
+					const agentLabel = formatAgentLabel(
+						t.agent,
+						t.agent === "worker" ? (t.effort ?? DEFAULT_WORKER_EFFORT) : t.effort,
+					);
 					text += `\n  ${theme.fg("accent", agentLabel)}${theme.fg("dim", ` ${preview}`)}`;
 				}
 				if (args.tasks.length > 3) text += `\n  ${theme.fg("muted", `... +${args.tasks.length - 3} more`)}`;
 				return new Text(text, 0, 0);
 			}
 			const agentName = args.agent || "...";
-			const agentLabel = agentName;
+			const agentLabel = formatAgentLabel(
+				agentName,
+				agentName === "worker" ? (args.effort ?? DEFAULT_WORKER_EFFORT) : args.effort,
+			);
 			const preview = args.task ? (args.task.length > 60 ? `${args.task.slice(0, 60)}...` : args.task) : "...";
 			let text =
 				theme.fg("toolTitle", theme.bold("subagent ")) +
