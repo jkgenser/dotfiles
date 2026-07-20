@@ -34,6 +34,7 @@ function createRecordingTui(stop) {
 test("default terminal compatibility preserves native selection and links", () => {
   assert.equal(config.DEFAULT_STICKY_INPUT_CONFIG.mouseScroll, false);
   assert.equal(config.DEFAULT_STICKY_INPUT_CONFIG.alternateScroll, true);
+  assert.equal(config.DEFAULT_STICKY_INPUT_CONFIG.mouseWheelScrollRows, 2);
 });
 
 test("alternate screen stop restores the main-screen keyboard protocol stack", () => {

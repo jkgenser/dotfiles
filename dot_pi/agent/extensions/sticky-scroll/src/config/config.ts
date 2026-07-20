@@ -43,7 +43,7 @@ export const DEFAULT_STICKY_INPUT_CONFIG: StickyInputConfig = {
   alternateScroll: true,
   scrollWhileTyping: true,
   mouseScroll: false,
-  mouseWheelScrollRows: 3,
+  mouseWheelScrollRows: 2,
   keyboardScroll: true,
   keyboardScrollRows: 10,
   minimumHistoryRows: 3,

@@ -57,10 +57,13 @@ Later files override earlier ones. Relevant defaults:
   "alternateScroll": true,
   "scrollWhileTyping": true,
   "mouseScroll": false,
+  "mouseWheelScrollRows": 2,
   "keyboardScroll": true,
   "historyViewportLineLimit": 1000
 }
 ```
+
+`mouseWheelScrollRows` controls how many history rows each wheel event moves. The default is 2; lower it to 1 for the slowest scrolling.
 
 `historyViewportLineLimit` is the maximum number of rendered history lines exposed to the sticky viewport. Older rendered lines are intentionally not scrollable through this extension and are represented by a truncation marker; the underlying Pi conversation is unchanged.
 
