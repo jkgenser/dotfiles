@@ -30,25 +30,6 @@ import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
-const IMPLEMENTATION_AGENT_NAMES = ["worker-lite", "worker", "worker-max"] as const;
-type ImplementationAgentName = (typeof IMPLEMENTATION_AGENT_NAMES)[number];
-const IMPLEMENTATION_AGENT_NAME_SET = new Set<string>(IMPLEMENTATION_AGENT_NAMES);
-const WORKER_EFFORTS = ["medium", "high", "xhigh", "max"] as const;
-type WorkerEffort = (typeof WORKER_EFFORTS)[number];
-interface WorkerEffortConfig {
-	allowed: readonly WorkerEffort[];
-	defaultEffort: WorkerEffort;
-}
-const WORKER_EFFORT_CONFIG: Record<ImplementationAgentName, WorkerEffortConfig> = {
-	"worker-lite": { allowed: ["high", "xhigh", "max"], defaultEffort: "high" },
-	worker: { allowed: ["medium", "high", "xhigh"], defaultEffort: "medium" },
-	"worker-max": { allowed: ["medium", "high", "xhigh"], defaultEffort: "medium" },
-};
-const PR_REVIEWER_THINKING_LEVELS = ["xhigh", "max"] as const;
-type PrReviewerThinking = (typeof PR_REVIEWER_THINKING_LEVELS)[number];
-type RuntimeThinkingLevel = WorkerEffort | PrReviewerThinking;
-const THINKING_SUFFIX_RE = /:(off|minimal|low|medium|high|xhigh|max)$/;
-
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
 const COLLAPSED_ITEM_COUNT = 10;
@@ -86,28 +67,6 @@ function formatUsageStats(
 	}
 	if (model) parts.push(model);
 	return parts.join(" ");
-}
-
-function isWorkerEffort(value: unknown): value is WorkerEffort {
-	return WORKER_EFFORTS.includes(value as WorkerEffort);
-}
-
-function isImplementationAgent(agentName: string): agentName is ImplementationAgentName {
-	return IMPLEMENTATION_AGENT_NAME_SET.has(agentName);
-}
-
-function getDisplayEffort(agentName: string, effort: unknown): WorkerEffort | undefined {
-	if (!isImplementationAgent(agentName)) return undefined;
-	return isWorkerEffort(effort) ? effort : WORKER_EFFORT_CONFIG[agentName].defaultEffort;
-}
-
-function formatAgentLabel(agentName: string, reasoningLevel?: RuntimeThinkingLevel): string {
-	return reasoningLevel ? `${agentName}:${reasoningLevel}` : agentName;
-}
-
-function modelWithThinkingLevel(model: string | undefined, thinking: WorkerEffort): string | undefined {
-	if (!model) return model;
-	return `${model.replace(THINKING_SUFFIX_RE, "")}:${thinking}`;
 }
 
 function formatToolCall(
@@ -197,9 +156,6 @@ interface SingleResult {
 	stderr: string;
 	usage: UsageStats;
 	model?: string;
-	effort?: WorkerEffort;
-	thinking?: PrReviewerThinking;
-	profilePath?: string;
 	stopReason?: string;
 	errorMessage?: string;
 	step?: number;
@@ -291,61 +247,6 @@ async function writePromptToTempFile(agentName: string, prompt: string): Promise
 	return { dir: tmpDir, filePath };
 }
 
-interface AgentRuntime {
-	model?: string;
-	systemPrompt: string;
-	effort?: WorkerEffort;
-	thinking?: PrReviewerThinking;
-	profilePath?: string;
-}
-
-function resolveAgentRuntime(
-	agent: AgentConfig,
-	requestedEffort: WorkerEffort | undefined,
-	requestedThinking: PrReviewerThinking | undefined,
-): AgentRuntime {
-	if (requestedThinking && agent.name !== "pr-reviewer") {
-		throw new Error('The thinking parameter is only supported for "pr-reviewer".');
-	}
-	if (!isImplementationAgent(agent.name)) {
-		if (requestedEffort) {
-			throw new Error(`The effort parameter is only supported for: ${IMPLEMENTATION_AGENT_NAMES.join(", ")}.`);
-		}
-		return {
-			model: agent.model,
-			systemPrompt: agent.systemPrompt,
-			thinking: requestedThinking,
-		};
-	}
-	if (requestedThinking) {
-		throw new Error('The thinking parameter cannot be combined with implementation-agent effort.');
-	}
-
-	const effortConfig = WORKER_EFFORT_CONFIG[agent.name];
-	const effort = requestedEffort ?? effortConfig.defaultEffort;
-	if (!effortConfig.allowed.includes(effort)) {
-		throw new Error(
-			`The effort parameter for "${agent.name}" must be one of: ${effortConfig.allowed.join(", ")}.`,
-		);
-	}
-	const profilePath = path.join(path.dirname(agent.filePath), "worker-profiles", `${effort}.md`);
-	let profilePrompt: string;
-	try {
-		profilePrompt = fs.readFileSync(profilePath, "utf-8");
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`Failed to load ${agent.name} ${effort} profile from ${profilePath}: ${message}`);
-	}
-
-	const systemPrompt = [agent.systemPrompt.trimEnd(), profilePrompt.trim()].filter(Boolean).join("\n\n");
-	return {
-		model: modelWithThinkingLevel(agent.model, effort),
-		systemPrompt: systemPrompt ? `${systemPrompt}\n` : "",
-		effort,
-		profilePath,
-	};
-}
-
 function getPiInvocation(args: string[]): { command: string; args: string[] } {
 	const currentScript = process.argv[1];
 	const isBunVirtualScript = currentScript?.startsWith("/$bunfs/root/");
@@ -369,8 +270,6 @@ async function runSingleAgent(
 	agents: AgentConfig[],
 	agentName: string,
 	task: string,
-	effort: WorkerEffort | undefined,
-	thinking: PrReviewerThinking | undefined,
 	cwd: string | undefined,
 	step: number | undefined,
 	signal: AbortSignal | undefined,
@@ -393,35 +292,8 @@ async function runSingleAgent(
 		};
 	}
 
-	let runtime: AgentRuntime;
-	try {
-		runtime = resolveAgentRuntime(agent, effort, thinking);
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		return {
-			agent: agentName,
-			agentSource: agent.source,
-			task,
-			exitCode: 1,
-			messages: [],
-			stderr: message,
-			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
-			model: agent.model,
-			effort,
-			thinking,
-			errorMessage: message,
-			step,
-		};
-	}
-
 	const args: string[] = ["--mode", "json", "-p", "--no-session", "--exclude-tools", "subagent"];
-	if (agentName === "pr-reviewer") {
-		// Reviews may inspect untrusted PRs. Do not load instructions or executable
-		// resources from the reviewed worktree into the child Pi process.
-		args.push("--no-context-files", "--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates");
-	}
-	if (runtime.model) args.push("--model", runtime.model);
-	if (runtime.thinking) args.push("--thinking", runtime.thinking);
+	if (agent.model) args.push("--model", agent.model);
 	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
 
 	let tmpPromptDir: string | null = null;
@@ -435,10 +307,7 @@ async function runSingleAgent(
 		messages: [],
 		stderr: "",
 		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
-		model: runtime.model,
-		effort: runtime.effort,
-		thinking: runtime.thinking,
-		profilePath: runtime.profilePath,
+		model: agent.model,
 		step,
 	};
 
@@ -452,8 +321,8 @@ async function runSingleAgent(
 	};
 
 	try {
-		if (runtime.systemPrompt.trim()) {
-			const tmp = await writePromptToTempFile(agent.name, runtime.systemPrompt);
+		if (agent.systemPrompt.trim()) {
+			const tmp = await writePromptToTempFile(agent.name, agent.systemPrompt);
 			tmpPromptDir = tmp.dir;
 			tmpPromptPath = tmp.filePath;
 			args.push("--append-system-prompt", tmpPromptPath);
@@ -564,26 +433,15 @@ async function runSingleAgent(
 	}
 }
 
-const WorkerEffortSchema = StringEnum(WORKER_EFFORTS, {
-	description:
-		'Reasoning effort for implementation agents. "worker-lite" accepts high/xhigh/max (default high); "worker" and "worker-max" accept medium/high/xhigh (default medium).',
-});
-
-const PrReviewerThinkingSchema = StringEnum(PR_REVIEWER_THINKING_LEVELS, {
-	description: 'Thinking level override for "pr-reviewer" in single mode. Its configured default is "xhigh".',
-});
-
 const TaskItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task to delegate to the agent" }),
-	effort: Type.Optional(WorkerEffortSchema),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
 });
 
 const ChainItem = Type.Object({
 	agent: Type.String({ description: "Name of the agent to invoke" }),
 	task: Type.String({ description: "Task with optional {previous} placeholder for prior output" }),
-	effort: Type.Optional(WorkerEffortSchema),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process" })),
 });
 
@@ -595,10 +453,8 @@ const AgentScopeSchema = StringEnum(["user", "project", "both"] as const, {
 const SubagentParams = Type.Object({
 	agent: Type.Optional(Type.String({ description: "Name of the agent to invoke (for single mode)" })),
 	task: Type.Optional(Type.String({ description: "Task to delegate (for single mode)" })),
-	effort: Type.Optional(WorkerEffortSchema),
-	thinking: Type.Optional(PrReviewerThinkingSchema),
-	tasks: Type.Optional(Type.Array(TaskItem, { description: "Array of {agent, task, optional effort} for parallel execution" })),
-	chain: Type.Optional(Type.Array(ChainItem, { description: "Array of {agent, task, optional effort} for sequential execution" })),
+	tasks: Type.Optional(Type.Array(TaskItem, { description: "Array of {agent, task} for parallel execution" })),
+	chain: Type.Optional(Type.Array(ChainItem, { description: "Array of {agent, task} for sequential execution" })),
 	agentScope: Type.Optional(AgentScopeSchema),
 	confirmProjectAgents: Type.Optional(
 		Type.Boolean({ description: "Prompt before running project-local agents. Default: true.", default: true }),
@@ -611,14 +467,11 @@ export default function (pi: ExtensionAPI) {
 		name: "subagent",
 		label: "Subagent",
 		description: [
-			"Delegate tasks to specialized subagents with isolated context.",
-			"Handle ordinary tasks directly; do not delegate merely because a task is multi-file or nontrivial.",
-			'Use "planner", "reviewer-lite", or "reviewer" only when the user explicitly requests one or the work is exceptionally complex or high-risk. When uncertain, do not use them.',
+			"Delegate implementation or codebase reconnaissance to isolated subagents.",
+			"Handle ordinary tasks and all code reviews directly in the main agent; do not delegate merely because a task is multi-file or nontrivial.",
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
-			'For explicit reviews, choose "reviewer-lite" for focused, bounded, low-risk changes and "reviewer" for broad, complex, or high-risk changes.',
-			'Choose "worker-lite" for straightforward, bounded, low-risk implementation, "worker" for nontrivial or moderately risky work, and "worker-max" for the broadest, most ambiguous, or highest-risk work.',
-			'Choose reasoning effort independently of model tier: "worker-lite" accepts "high", "xhigh", or "max" (default "high"), while "worker" and "worker-max" accept "medium", "high", or "xhigh" (default "medium"); profiles load lazily.',
-			'For "pr-reviewer", optionally set thinking to "xhigh" or "max"; without it the agent model configuration is used.',
+			'Use "scout" for fast codebase reconnaissance, "worker-lite" for straightforward bounded implementation, and "worker" for nontrivial or risky implementation.',
+			'"scout" uses the direct DeepSeek API at high reasoning effort; "worker-lite" uses direct DeepSeek Pro at max; "worker" uses Terra at max.',
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
 		].join(" "),
@@ -643,14 +496,6 @@ export default function (pi: ExtensionAPI) {
 					projectAgentsDir: discovery.projectAgentsDir,
 					results,
 				});
-
-			if (params.thinking && !hasSingle) {
-				return {
-					content: [{ type: "text", text: "The thinking parameter is only supported in single mode." }],
-					details: makeDetails(hasChain ? "chain" : hasTasks ? "parallel" : "single")([]),
-					isError: true,
-				};
-			}
 
 			if (modeCount !== 1) {
 				const available = agents.map((a) => `${a.name} (${a.source})`).join(", ") || "none";
@@ -718,8 +563,6 @@ export default function (pi: ExtensionAPI) {
 						agents,
 						step.agent,
 						taskWithContext,
-						step.effort,
-						undefined,
 						step.cwd,
 						i + 1,
 						signal,
@@ -770,7 +613,6 @@ export default function (pi: ExtensionAPI) {
 						messages: [],
 						stderr: "",
 						usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
-						effort: getDisplayEffort(params.tasks[i].agent, params.tasks[i].effort),
 					};
 				}
 
@@ -793,8 +635,6 @@ export default function (pi: ExtensionAPI) {
 						agents,
 						t.agent,
 						t.task,
-						t.effort,
-						undefined,
 						t.cwd,
 						undefined,
 						signal,
@@ -818,7 +658,7 @@ export default function (pi: ExtensionAPI) {
 					const status = isFailedResult(r)
 						? `failed${r.stopReason && r.stopReason !== "end" ? ` (${r.stopReason})` : ""}`
 						: "completed";
-					return `### [${formatAgentLabel(r.agent, r.effort ?? r.thinking)}] ${status}\n\n${output}`;
+					return `### [${r.agent}] ${status}\n\n${output}`;
 				});
 				return {
 					content: [
@@ -837,8 +677,6 @@ export default function (pi: ExtensionAPI) {
 					agents,
 					params.agent,
 					params.task,
-					params.effort,
-					params.thinking,
 					params.cwd,
 					undefined,
 					signal,
@@ -879,7 +717,7 @@ export default function (pi: ExtensionAPI) {
 					// Clean up {previous} placeholder for display
 					const cleanTask = step.task.replace(/\{previous\}/g, "").trim();
 					const preview = cleanTask.length > 40 ? `${cleanTask.slice(0, 40)}...` : cleanTask;
-					const agentLabel = formatAgentLabel(step.agent, getDisplayEffort(step.agent, step.effort));
+					const agentLabel = step.agent;
 					text +=
 						"\n  " +
 						theme.fg("muted", `${i + 1}.`) +
@@ -897,14 +735,14 @@ export default function (pi: ExtensionAPI) {
 					theme.fg("muted", ` [${scope}]`);
 				for (const t of args.tasks.slice(0, 3)) {
 					const preview = t.task.length > 40 ? `${t.task.slice(0, 40)}...` : t.task;
-					const agentLabel = formatAgentLabel(t.agent, getDisplayEffort(t.agent, t.effort));
+					const agentLabel = t.agent;
 					text += `\n  ${theme.fg("accent", agentLabel)}${theme.fg("dim", ` ${preview}`)}`;
 				}
 				if (args.tasks.length > 3) text += `\n  ${theme.fg("muted", `... +${args.tasks.length - 3} more`)}`;
 				return new Text(text, 0, 0);
 			}
 			const agentName = args.agent || "...";
-			const agentLabel = formatAgentLabel(agentName, getDisplayEffort(agentName, args.effort) ?? args.thinking);
+			const agentLabel = agentName;
 			const preview = args.task ? (args.task.length > 60 ? `${args.task.slice(0, 60)}...` : args.task) : "...";
 			let text =
 				theme.fg("toolTitle", theme.bold("subagent ")) +
@@ -948,7 +786,7 @@ export default function (pi: ExtensionAPI) {
 
 				if (expanded) {
 					const container = new Container();
-					let header = `${icon} ${theme.fg("toolTitle", theme.bold(formatAgentLabel(r.agent, r.effort ?? r.thinking)))}${theme.fg("muted", ` (${r.agentSource})`)}`;
+					let header = `${icon} ${theme.fg("toolTitle", theme.bold(r.agent))}${theme.fg("muted", ` (${r.agentSource})`)}`;
 					if (isError && r.stopReason) header += ` ${theme.fg("error", `[${r.stopReason}]`)}`;
 					container.addChild(new Text(header, 0, 0));
 					if (isError && r.errorMessage)
@@ -984,7 +822,7 @@ export default function (pi: ExtensionAPI) {
 					return container;
 				}
 
-				let text = `${icon} ${theme.fg("toolTitle", theme.bold(formatAgentLabel(r.agent, r.effort ?? r.thinking)))}${theme.fg("muted", ` (${r.agentSource})`)}`;
+				let text = `${icon} ${theme.fg("toolTitle", theme.bold(r.agent))}${theme.fg("muted", ` (${r.agentSource})`)}`;
 				if (isError && r.stopReason) text += ` ${theme.fg("error", `[${r.stopReason}]`)}`;
 				if (isError && r.errorMessage) text += `\n${theme.fg("error", `Error: ${r.errorMessage}`)}`;
 				else if (displayItems.length === 0) text += `\n${theme.fg("muted", "(no output)")}`;
@@ -1035,7 +873,7 @@ export default function (pi: ExtensionAPI) {
 						container.addChild(new Spacer(1));
 						container.addChild(
 							new Text(
-								`${theme.fg("muted", `─── Step ${r.step}: `) + theme.fg("accent", formatAgentLabel(r.agent, r.effort))} ${rIcon}`,
+								`${theme.fg("muted", `─── Step ${r.step}: `) + theme.fg("accent", r.agent)} ${rIcon}`,
 								0,
 								0,
 							),
@@ -1082,7 +920,7 @@ export default function (pi: ExtensionAPI) {
 				for (const r of details.results) {
 					const rIcon = r.exitCode === 0 ? theme.fg("success", "✓") : theme.fg("error", "✗");
 					const displayItems = getDisplayItems(r.messages);
-					text += `\n\n${theme.fg("muted", `─── Step ${r.step}: `)}${theme.fg("accent", formatAgentLabel(r.agent, r.effort))} ${rIcon}`;
+					text += `\n\n${theme.fg("muted", `─── Step ${r.step}: `)}${theme.fg("accent", r.agent)} ${rIcon}`;
 					if (displayItems.length === 0) text += `\n${theme.fg("muted", "(no output)")}`;
 					else text += `\n${renderDisplayItems(displayItems, 5)}`;
 				}
@@ -1123,7 +961,7 @@ export default function (pi: ExtensionAPI) {
 
 						container.addChild(new Spacer(1));
 						container.addChild(
-							new Text(`${theme.fg("muted", "─── ") + theme.fg("accent", formatAgentLabel(r.agent, r.effort))} ${rIcon}`, 0, 0),
+							new Text(`${theme.fg("muted", "─── ") + theme.fg("accent", r.agent)} ${rIcon}`, 0, 0),
 						);
 						container.addChild(new Text(theme.fg("muted", "Task: ") + theme.fg("dim", r.task), 0, 0));
 
@@ -1168,7 +1006,7 @@ export default function (pi: ExtensionAPI) {
 								? theme.fg("error", "✗")
 								: theme.fg("success", "✓");
 					const displayItems = getDisplayItems(r.messages);
-					text += `\n\n${theme.fg("muted", "─── ")}${theme.fg("accent", formatAgentLabel(r.agent, r.effort))} ${rIcon}`;
+					text += `\n\n${theme.fg("muted", "─── ")}${theme.fg("accent", r.agent)} ${rIcon}`;
 					if (displayItems.length === 0)
 						text += `\n${theme.fg("muted", r.exitCode === -1 ? "(running...)" : "(no output)")}`;
 					else text += `\n${renderDisplayItems(displayItems, 5)}`;

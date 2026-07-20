@@ -1,9 +1,6 @@
 ---
-description: Scout gathers context, planner creates implementation plan (no implementation)
+description: Scout gathers context, then the main agent creates an implementation plan
 ---
-Use the subagent tool with the chain parameter to execute this workflow:
+Use the `scout` subagent to find all code relevant to: $@
 
-1. First, use the "scout" agent to find all code relevant to: $@
-2. Then, use the "planner" agent to create an implementation plan for "$@" using the context from the previous step (use {previous} placeholder)
-
-Execute this as a chain, passing output between steps via {previous}. Do NOT implement - just return the plan.
+After the scout returns, create the implementation plan directly in the main agent using its findings. Do not delegate planning and do not implement anything; return only the plan.
