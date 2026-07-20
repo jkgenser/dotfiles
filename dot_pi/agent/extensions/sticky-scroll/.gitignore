@@ -1,0 +1,6 @@
+# Local runtime state
+config.json
+debug/
+
+# Temporary test dependencies
+node_modules/
