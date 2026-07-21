@@ -12,7 +12,7 @@
     "deepseek/deepseek-v4-pro",
     "anthropic-vertex/claude-opus-4-8",
     "anthropic-vertex/claude-fable-5",
-    "google-vertex/gemini-3.5-flash"
+    "google-vertex/gemini-3.6-flash"
   ],
   "lastChangelogVersion": "0.80.5",
   "tokenSpeed": {
