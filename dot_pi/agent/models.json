@@ -8,16 +8,13 @@
           "name": "Gemini 3.6 Flash (Vertex)",
           "api": "google-vertex",
           "reasoning": true,
-          "thinkingLevelMap": {
-            "off": null
-          },
           "input": ["text", "image"],
           "contextWindow": 1048576,
           "maxTokens": 65536,
           "cost": {
             "input": 1.5,
             "output": 7.5,
-            "cacheRead": 0.15,
+            "cacheRead": 0,
             "cacheWrite": 0
           }
         }
