@@ -24,6 +24,7 @@ const DEFAULT_LOCATION = "global"
 const TARGET_MODEL_IDS = new Set([
   "claude-opus-4-6",
   "claude-opus-4-8",
+  "claude-opus-5",
   "claude-fable-5",
 ])
 
@@ -364,6 +365,26 @@ export default function (pi: ExtensionAPI) {
       contextWindow,
       maxTokens,
     }))
+
+  // pi 0.82.0 predates the Claude Opus 5 catalog entry. Keep this fallback
+  // until getModels("anthropic") supplies it, then use the catalog metadata.
+  if (!models.some((model) => model.id === "claude-opus-5")) {
+    models.push({
+      id: "claude-opus-5",
+      name: "Claude Opus 5 (Vertex AI)",
+      reasoning: true,
+      thinkingLevelMap: { xhigh: "xhigh", max: "max" },
+      input: ["text", "image"],
+      cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+      contextWindow: 1_000_000,
+      maxTokens: 128_000,
+      compat: {
+        forceAdaptiveThinking: true,
+        supportsTemperature: false,
+        supportsStrictTools: true,
+      },
+    })
+  }
 
   if (models.length === 0) {
     console.warn(`[${PROVIDER_ID}] disabled: no matching built-in Anthropic models found`)
