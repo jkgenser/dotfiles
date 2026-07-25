@@ -39,6 +39,14 @@ type MessagesCreateParams = Record<string, unknown> & {
   stream?: unknown
 }
 
+type VertexErrorResponse = {
+  error?: {
+    code?: unknown
+    message?: unknown
+    status?: unknown
+  }
+}
+
 type TokenCache = {
   token: string
   expiresAt: number
@@ -59,13 +67,15 @@ const env = (...names: string[]): string | undefined => {
 }
 
 const getProject = (): string | undefined =>
-  env("ANTHROPIC_VERTEX_PROJECT_ID", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT")
+  env("ANTHROPIC_VERTEX_PROJECT_ID", "GOOGLE_CLOUD_PROJECT", "GOOGLE_VERTEX_PROJECT", "GCLOUD_PROJECT")
 
 const getLocation = (): string =>
   env(
     "ANTHROPIC_VERTEX_LOCATION",
     "ANTHROPIC_VERTEX_REGION",
     "GOOGLE_CLOUD_LOCATION",
+    "GOOGLE_VERTEX_LOCATION",
+    "VERTEX_LOCATION",
     "CLOUD_ML_REGION",
   ) ?? DEFAULT_LOCATION
 
@@ -186,6 +196,27 @@ const combineSignals = (signal: AbortSignal | undefined, timeoutMs: number | und
   return signal
 }
 
+const formatVertexError = async (response: Response): Promise<string> => {
+  const body = await response.text()
+  let code: unknown = response.status
+  let status: unknown = response.statusText
+  let message = body.trim()
+
+  try {
+    const parsed = JSON.parse(body) as VertexErrorResponse | VertexErrorResponse[]
+    const error = (Array.isArray(parsed) ? parsed[0] : parsed)?.error
+    if (error) {
+      code = error.code ?? code
+      status = error.status ?? status
+      if (typeof error.message === "string") message = error.message
+    }
+  } catch {}
+
+  const detail = [code, status].filter((value) => value !== undefined && value !== "").join(" ")
+  const normalizedMessage = message.replace(/\s+/g, " ").slice(0, 2_000) || "empty response body"
+  return `Anthropic Vertex request failed (${detail}): ${normalizedMessage}`
+}
+
 class AnthropicVertexMessagesShim {
   readonly messages = {
     create: (params: MessagesCreateParams, requestOptions?: VertexRequestOptions) => ({
@@ -215,7 +246,7 @@ class AnthropicVertexMessagesShim {
       `/locations/${encodeURIComponent(location)}` +
       `/publishers/anthropic/models/${encodeURIComponent(modelId)}:streamRawPredict`
 
-    return fetch(url, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         ...this.defaultHeaders,
@@ -229,6 +260,9 @@ class AnthropicVertexMessagesShim {
       }),
       signal: combineSignals(requestOptions?.signal, requestOptions?.timeout),
     })
+
+    if (!response.ok) throw new Error(await formatVertexError(response))
+    return response
   }
 }
 
