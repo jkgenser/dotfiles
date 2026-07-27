@@ -201,6 +201,16 @@ v0.7.0 (commit `75e0aca`), but is independently implemented and does not vendor
 that package's source. Defaults live under `tokenSpeed` in
 `dot_pi/agent/settings.json`.
 
+## Pi Codex Usage Pace
+
+The local extension at `dot_pi/agent/extensions/codex-usage-pace/` compares the
+percentage of the weekly Codex quota period elapsed with the percentage of
+quota consumed. It appears only for `openai-codex` models and renders separate
+`t` (time) and `u` (usage) bars, their percentage-point pacing difference, and
+the reset countdown in Pi's footer. It refreshes from Pi's Codex subscription
+auth after settled runs and every three minutes, with Codex app-server as a
+fallback.
+
 Pi's subagent extension provides three implementation tiers. `worker-lite` uses
 `openai-codex/gpt-5.6-luna` for straightforward, bounded, low-risk work;
 `worker` uses `openai-codex/gpt-5.6-terra` for nontrivial or moderately risky
