@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# pi-focus — Focus the terminal window that owns a Pi process.
+#
+# Usage:
+#   pi-focus [--container-id ID] PID
+#   pi-focus --describe [--container-id ID] PID
+#   pi-focus --id [--container-id ID] PID
+#
+# Default action: focus the container matching PID.
+# --describe : emit compact JSON  {backend, containerId, title, workspace}
+# --id       : print only the container ID
+# --container-id ID : skip PID‑tree walk, use this container directly
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  pi-focus [--container-id ID] PID
+  pi-focus --describe [--container-id ID] PID
+  pi-focus --id [--container-id ID] PID
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Backend detection
+# ---------------------------------------------------------------------------
+
+detect_backend() {
+  if [[ -n "${SWAYSOCK:-}" ]] && command -v swaymsg >/dev/null 2>&1; then
+    printf '%s\n' sway
+  elif [[ -n "${I3SOCK:-}" ]] && command -v i3-msg >/dev/null 2>&1; then
+    printf '%s\n' i3
+  else
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Tree helpers
+# ---------------------------------------------------------------------------
+
+get_tree() {
+  case "$1" in
+    sway) swaymsg -t get_tree 2>/dev/null ;;
+    i3)   i3-msg -t get_tree 2>/dev/null ;;
+  esac
+}
+
+# jq filter that emits {id, pid, name, workspace} for every leaf node with a pid.
+# Workspace is tracked across the recursion; capture .name before map.
+# shellcheck disable=SC2016
+JQ_FLATTEN='
+  def walk(ws):
+    (if .pid then [{id: .id, pid: .pid, name: .name, workspace: ws}] else [] end) +
+    (if .type == "workspace" then
+      .name as $ws_name | ((.nodes // []) + (.floating_nodes // [])) | map(walk($ws_name)) | add
+    else
+      ((.nodes // []) + (.floating_nodes // [])) | map(walk(ws)) | add
+    end);
+  walk(null)
+'
+
+# Look up a container by id in the tree and emit {id, pid, name, workspace}.
+lookup_container() {
+  local backend=$1 tree_json=$2 cid=$3
+  printf '%s\n' "$tree_json" | jq -e --argjson cid "$cid" "
+    $JQ_FLATTEN | .[] | select(.id == \$cid)
+  "
+}
+
+# ---------------------------------------------------------------------------
+# Container matching
+# ---------------------------------------------------------------------------
+
+# Given a target PID, walk the compositor tree and find the best matching
+# container. "Best" means the container whose pid field is the closest
+# ancestor of the target PID (including the target PID itself).  Walks up the
+# process tree from target PID; the first window pid that matches an ancestor
+# wins.
+find_container() {
+  local backend=$1 tree_json=$2 target_pid=$3
+  local current=$target_pid
+  local max_up=128
+
+  while (( max_up-- > 0 )); do
+    local match
+    match=$(printf '%s\n' "$tree_json" | jq --argjson pid "$current" "
+      $JQ_FLATTEN | map(select(.pid == \$pid)) | if length > 0 then .[0] else null end
+    ")
+    if [[ "$match" != null ]]; then
+      printf '%s\n' "$match"
+      return 0
+    fi
+    (( current <= 1 )) && break
+    current=$(awk '/^PPid:/ {print $2}' "/proc/$current/status" 2>/dev/null) || break
+    [[ -n "$current" ]] || break
+  done
+  return 1
+}
+
+# ---------------------------------------------------------------------------
+# Focus
+# ---------------------------------------------------------------------------
+
+focus_container() {
+  local backend=$1 cid=$2
+  case "$backend" in
+    sway) swaymsg "[con_id=$cid]" focus >/dev/null ;;
+    i3)   i3-msg "[con_id=$cid]" focus >/dev/null ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Validate PID
+# ---------------------------------------------------------------------------
+
+validate_pid() {
+  local pid=$1
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || {
+    printf 'pi-focus: invalid PID: %s\n' "$pid" >&2
+    exit 1
+  }
+}
+
+validate_container_id() {
+  local container_id=$1
+  [[ "$container_id" =~ ^[1-9][0-9]*$ ]] || {
+    printf 'pi-focus: invalid container ID: %s\n' "$container_id" >&2
+    exit 1
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+main() {
+  local mode=focus container_id='' target_pid=''
+
+  # Parse flags.
+  while (($# > 0)); do
+    case "$1" in
+      --describe) mode=describe ;;
+      --id)       mode=id ;;
+      --container-id)
+        shift
+        [[ $# -gt 0 ]] || { usage; exit 2; }
+        container_id=$1
+        ;;
+      --help|-h)  usage; exit 0 ;;
+      --*)        printf 'pi-focus: unknown option: %s\n' "$1" >&2; exit 2 ;;
+      -*)
+        # Catch combined short flags that aren't explicitly handled.
+        printf 'pi-focus: unknown option: %s\n' "$1" >&2; exit 2
+        ;;
+      *)
+        if [[ -n "$target_pid" ]]; then
+          printf 'pi-focus: unexpected extra argument: %s\n' "$1" >&2
+          exit 2
+        fi
+        target_pid=$1
+        ;;
+    esac
+    shift
+  done
+
+  # We need at least a PID or a container-id (for focus mode without --container-id, PID is required).
+  if [[ -z "$target_pid" ]]; then
+    printf 'pi-focus: PID argument is required\n' >&2
+    usage
+    exit 2
+  fi
+
+  validate_pid "$target_pid"
+  if [[ -n "$container_id" ]]; then
+    validate_container_id "$container_id"
+  elif [[ ! -d "/proc/$target_pid" ]]; then
+    printf 'pi-focus: PID does not exist: %s\n' "$target_pid" >&2
+    exit 1
+  fi
+
+  # Detect backend.
+  local backend
+  backend=$(detect_backend) || {
+    printf 'pi-focus: no supported compositor backend found (sway/i3)\n' >&2
+    exit 3
+  }
+
+  # Fetch tree once (needed for describe/id if --container-id not given, or for container-id lookups).
+  local tree_json
+  tree_json=$(get_tree "$backend") || {
+    printf 'pi-focus: failed to query compositor tree from %s\n' "$backend" >&2
+    exit 4
+  }
+
+  # Resolve the container id and metadata.
+  local cid title workspace
+
+  if [[ -n "$container_id" ]]; then
+    cid=$container_id
+    # Look up metadata from tree.
+    local meta
+    meta=$(lookup_container "$backend" "$tree_json" "$cid") || {
+      printf 'pi-focus: container %s not found in compositor tree\n' "$cid" >&2
+      exit 5
+    }
+    title=$(jq -r '.name // ""' <<<"$meta")
+    workspace=$(jq -r '.workspace // ""' <<<"$meta")
+  else
+    local match
+    match=$(find_container "$backend" "$tree_json" "$target_pid") || {
+      printf 'pi-focus: no window found for PID %s (or its ancestors)\n' "$target_pid" >&2
+      exit 5
+    }
+    cid=$(jq -r '.id' <<<"$match")
+    title=$(jq -r '.name // ""' <<<"$match")
+    workspace=$(jq -r '.workspace // ""' <<<"$match")
+  fi
+
+  case "$mode" in
+    focus)
+      focus_container "$backend" "$cid"
+      ;;
+    describe)
+      jq -n --arg backend "$backend" \
+            --argjson containerId "$cid" \
+            --arg title "$title" \
+            --arg workspace "$workspace" \
+            '{backend: $backend, containerId: $containerId, title: $title, workspace: $workspace}'
+      ;;
+    id)
+      printf '%s\n' "$cid"
+      ;;
+  esac
+}
+
+main "$@"

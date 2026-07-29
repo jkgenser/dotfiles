@@ -6,6 +6,9 @@
     origin = top-center
     offset = 0x80
     notification_limit = 3
+    # Dunst's generic history is in-memory; keep enough to browse a busy day.
+    history_length = 200
+    sticky_history = yes
 
     font = FiraCode Nerd Font Mono 13
     line_height = 4
@@ -34,6 +37,12 @@
     stack_duplicates = true
     hide_duplicate_count = false
     show_indicators = yes
+
+    # Keep normal left-click dismissal. Pi has a focus action, activated with
+    # Dunst's standard middle-click gesture, without changing every app's
+    # left-click behavior into an action/context menu.
+    mouse_left_click = close_current
+    mouse_middle_click = do_action, close_current
 
 [urgency_low]
     background = "#1e1e2e"

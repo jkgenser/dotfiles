@@ -66,6 +66,10 @@ bindsym $mod+Shift+q kill
 # bindcode $mod+40 exec --no-startup-id i3-dmenu-desktop
 bindsym $mod+d exec --no-startup-id rofi -show drun
 
+# Notifications: recall Dunst's latest item, or browse durable Pi events.
+bindsym $mod+n exec --no-startup-id dunstctl history-pop
+bindsym $mod+Shift+n exec --no-startup-id pi-notification-history
+
 # change focus
 bindsym $mod+h focus left
 bindsym $mod+j focus down

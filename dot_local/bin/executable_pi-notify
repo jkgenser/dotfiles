@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# Send a Pi notification that can focus its source terminal, and retain a
+# small, private history that survives Dunst restarts.
+
+set -euo pipefail
+umask 077
+
+readonly ICON="/usr/share/icons/Yaru/256x256/apps/terminal-app.png"
+readonly TIMEOUT_MS=12000
+readonly MAX_HISTORY=500
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  pi-notify --pid PID --kind KIND --summary SUMMARY --body BODY --cwd PATH \
+    --session-id ID [--session-file PATH] [--session-name NAME]
+EOF
+}
+
+die() {
+  printf 'pi-notify: %s\n' "$*" >&2
+  exit 2
+}
+
+escape_markup() {
+  # Dunst parses Pango markup. Only the compositor-provided workspace name
+  # needs escaping here; Pi already escapes its summary and body.
+  printf '%s' "$1" | tr '\r\n' ' ' | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+
+trim_history() {
+  local lines temp_file
+  lines=$(wc -l <"$history_file")
+  if (( lines <= MAX_HISTORY )); then
+    return
+  fi
+
+  temp_file=$(mktemp "$state_dir/.notifications.XXXXXX")
+  tail -n "$MAX_HISTORY" "$history_file" >"$temp_file"
+  chmod 600 "$temp_file"
+  mv "$temp_file" "$history_file"
+}
+
+append_history() {
+  local record=$1
+
+  if command -v flock >/dev/null 2>&1; then
+    (
+      flock -x 9
+      printf '%s\n' "$record" >>"$history_file"
+      trim_history
+    ) 9>>"$lock_file"
+  else
+    printf '%s\n' "$record" >>"$history_file"
+    trim_history
+  fi
+}
+
+pid=''
+kind=''
+summary=''
+body=''
+cwd=''
+session_id=''
+session_file=''
+session_name=''
+
+while (($# > 0)); do
+  case "$1" in
+    --pid|--kind|--summary|--body|--cwd|--session-id|--session-file|--session-name)
+      (($# >= 2)) || die "missing value for $1"
+      case "$1" in
+        --pid) pid=$2 ;;
+        --kind) kind=$2 ;;
+        --summary) summary=$2 ;;
+        --body) body=$2 ;;
+        --cwd) cwd=$2 ;;
+        --session-id) session_id=$2 ;;
+        --session-file) session_file=$2 ;;
+        --session-name) session_name=$2 ;;
+      esac
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+[[ -n "$pid" && -n "$kind" && -n "$summary" && -n "$body" && -n "$cwd" && -n "$session_id" ]] || {
+  usage
+  exit 2
+}
+[[ "$pid" =~ ^[1-9][0-9]*$ ]] || die "invalid PID: $pid"
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/pi"
+history_file="$state_dir/notifications.jsonl"
+lock_file="$state_dir/notifications.lock"
+mkdir -p "$state_dir"
+chmod 700 "$state_dir" 2>/dev/null || true
+touch "$history_file" "$lock_file"
+chmod 600 "$history_file" "$lock_file" 2>/dev/null || true
+
+container_id=''
+workspace=''
+window_title=''
+if command -v pi-focus >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  target=$(pi-focus --describe "$pid" 2>/dev/null || true)
+  if [[ -n "$target" ]] && jq -e '.containerId | type == "number"' >/dev/null 2>&1 <<<"$target"; then
+    container_id=$(jq -r '.containerId' <<<"$target")
+    workspace=$(jq -r '.workspace // ""' <<<"$target")
+    window_title=$(jq -r '.title // ""' <<<"$target")
+  fi
+fi
+
+if command -v jq >/dev/null 2>&1; then
+  container_json=null
+  if [[ -n "$container_id" ]]; then
+    container_json=$container_id
+  fi
+
+  record=$(jq -cn \
+    --arg id "$(date +%s%N)-${pid}-$$" \
+    --arg timestamp "$(date --iso-8601=seconds)" \
+    --arg kind "$kind" \
+    --arg summary "$summary" \
+    --arg body "$body" \
+    --arg cwd "$cwd" \
+    --arg sessionId "$session_id" \
+    --arg sessionFile "$session_file" \
+    --arg sessionName "$session_name" \
+    --arg workspace "$workspace" \
+    --arg windowTitle "$window_title" \
+    --argjson pid "$pid" \
+    --argjson containerId "$container_json" \
+    '{
+      id: $id,
+      timestamp: $timestamp,
+      kind: $kind,
+      summary: $summary,
+      body: $body,
+      cwd: $cwd,
+      sessionId: $sessionId,
+      sessionFile: $sessionFile,
+      sessionName: $sessionName,
+      workspace: $workspace,
+      windowTitle: $windowTitle,
+      pid: $pid,
+      containerId: $containerId
+    }')
+  append_history "$record" || true
+fi
+
+command -v notify-send >/dev/null 2>&1 || exit 0
+
+# Keep the source notification compact while making its Sway/i3 workspace
+# visible. The action is deliberately only offered when we found a window.
+display_summary=$summary
+display_body=$body
+if [[ -n "$container_id" ]]; then
+  focus_hint='Middle-click to focus'
+  if [[ -n "$workspace" ]]; then
+    escaped_workspace=$(escape_markup "$workspace")
+    display_summary+=" · ws ${escaped_workspace}"
+    focus_hint="Workspace ${workspace} · middle-click to focus"
+  fi
+  display_body+=$'\n'
+  display_body+="$(escape_markup "$focus_hint")"
+fi
+
+common_args=(
+  --app-name pi
+  --icon "$ICON"
+  --urgency normal
+  --expire-time "$TIMEOUT_MS"
+  --hint=string:sound-name:complete
+)
+
+if [[ -n "$container_id" ]] && command -v pi-focus >/dev/null 2>&1; then
+  action=''
+  action=$(notify-send "${common_args[@]}" '--action=focus=Focus Pi' "$display_summary" "$display_body" 2>/dev/null || true)
+  action=${action//$'\n'/}
+  if [[ "$action" == 'focus' ]]; then
+    pi-focus --container-id "$container_id" "$pid" >/dev/null 2>&1 || true
+  fi
+else
+  notify-send "${common_args[@]}" "$display_summary" "$display_body" >/dev/null 2>&1 || true
+fi

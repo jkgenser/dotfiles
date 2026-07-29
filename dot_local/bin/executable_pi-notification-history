@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# Browse durable Pi completion/questionnaire notifications and focus the
+# terminal that produced a selected event.
+
+set -euo pipefail
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/pi"
+history_file="$state_dir/notifications.jsonl"
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  pi-notification-history             # choose an event with wofi/rofi/fzf
+  pi-notification-history --list      # print machine-readable TSV records
+  pi-notification-history --focus ID  # focus one saved event
+EOF
+}
+
+list_records() {
+  [[ -s "$history_file" ]] || return 0
+
+  # Keep the id in column one for selection, then show newest records first.
+  # `fromjson?` lets a reader safely ignore a partially appended line.
+  jq -Rr '
+    fromjson?
+    | select(type == "object" and ((.id? | type) == "string"))
+    | [
+        .id,
+        ((.timestamp // "") | tostring),
+        ((.workspace // "") | tostring | if length > 0 then "ws " + . else "workspace ?" end),
+        ((.kind // "") | tostring),
+        ((.cwd // "") | tostring),
+        (((.sessionId // "") | tostring)[0:8])
+      ]
+    | map(gsub("[\\t\\r\\n]"; " "))
+    | @tsv
+  ' "$history_file" | tac
+}
+
+no_history() {
+  local message='No Pi notifications have been recorded yet.'
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send --app-name pi 'Pi notification history' "$message" >/dev/null 2>&1 || true
+  fi
+  printf 'pi-notification-history: %s\n' "$message" >&2
+}
+
+focus_record() {
+  local event_id=$1 record pid container_id
+  [[ -s "$history_file" ]] || {
+    no_history
+    return 1
+  }
+
+  record=$(jq -Rrc --arg id "$event_id" '
+    fromjson? | select(.id? == $id)
+  ' "$history_file" | tail -n 1)
+  [[ -n "$record" ]] || {
+    printf 'pi-notification-history: event not found: %s\n' "$event_id" >&2
+    return 1
+  }
+
+  pid=$(jq -r '.pid // empty' <<<"$record")
+  container_id=$(jq -r '.containerId // empty' <<<"$record")
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || {
+    printf 'pi-notification-history: event has no valid PID: %s\n' "$event_id" >&2
+    return 1
+  }
+
+  if ! command -v pi-focus >/dev/null 2>&1; then
+    printf 'pi-notification-history: pi-focus is not installed\n' >&2
+    return 1
+  fi
+
+  if [[ "$container_id" =~ ^[1-9][0-9]*$ ]]; then
+    pi-focus --container-id "$container_id" "$pid" && return 0
+  fi
+  # A terminal can be recreated after a compositor restart; fall back to the
+  # still-running Pi process when its saved container no longer exists.
+  pi-focus "$pid" && return 0
+
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send --app-name pi 'Pi notification history' \
+      'The terminal that produced this notification is no longer open.' >/dev/null 2>&1 || true
+  fi
+  return 1
+}
+
+case ${1:-} in
+  --help|-h)
+    usage
+    exit 0
+    ;;
+  --list)
+    (($# == 1)) || { usage; exit 2; }
+    list_records
+    exit 0
+    ;;
+  --focus)
+    (($# == 2)) || { usage; exit 2; }
+    focus_record "$2"
+    exit $?
+    ;;
+  '')
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
+
+if [[ ! -s "$history_file" ]]; then
+  no_history
+  exit 0
+fi
+
+menu_file=$(mktemp "$state_dir/.notification-menu.XXXXXX")
+trap 'rm -f "$menu_file"' EXIT
+list_records >"$menu_file"
+if [[ ! -s "$menu_file" ]]; then
+  no_history
+  exit 0
+fi
+
+if [[ -n "${SWAYSOCK:-}" ]] && command -v wofi >/dev/null 2>&1; then
+  selected=$(wofi --dmenu --prompt 'Pi notifications' <"$menu_file" || true)
+elif [[ -n "${I3SOCK:-}" ]] && command -v rofi >/dev/null 2>&1; then
+  selected=$(rofi -dmenu -p 'Pi notifications' <"$menu_file" || true)
+elif command -v wofi >/dev/null 2>&1; then
+  selected=$(wofi --dmenu --prompt 'Pi notifications' <"$menu_file" || true)
+elif command -v rofi >/dev/null 2>&1; then
+  selected=$(rofi -dmenu -p 'Pi notifications' <"$menu_file" || true)
+elif command -v fzf >/dev/null 2>&1; then
+  selected=$(fzf --prompt='Pi notifications> ' <"$menu_file" || true)
+else
+  printf 'pi-notification-history: install wofi, rofi, or fzf to select an event\n' >&2
+  exit 1
+fi
+
+[[ -n "${selected:-}" ]] || exit 0
+event_id=${selected%%$'\t'*}
+focus_record "$event_id"

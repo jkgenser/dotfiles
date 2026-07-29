@@ -31,7 +31,7 @@ Install baseline packages first. On Ubuntu/Debian-like systems:
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y git git-lfs curl wget unzip build-essential zsh ripgrep fd-find jq htop tree ca-certificates gnupg lsb-release alacritty i3 sway waybar wofi rofi polybar xdg-desktop-portal-wlr x11-xserver-utils xinput xss-lock i3lock network-manager-gnome pulseaudio-utils fontconfig
+sudo apt-get install -y git git-delta git-lfs curl wget unzip build-essential zsh ripgrep fd-find jq htop tree ca-certificates gnupg lsb-release alacritty i3 sway waybar wofi rofi polybar xdg-desktop-portal-wlr x11-xserver-utils xinput xss-lock i3lock network-manager-gnome pulseaudio-utils fontconfig
 ```
 
 Install Glow from Charm's official APT repository:
@@ -162,6 +162,20 @@ On sway, `obsidian` focuses an existing window. If needed, focus it manually:
 ```sh
 swaymsg '[app_id="obsidian"] focus'
 ```
+
+## Pi Notifications on Linux
+
+Pi completion and questionnaire notifications identify the project, session, and
+Sway/i3 workspace. Middle-clicking a live Pi notification invokes its Dunst
+action and focuses the terminal that produced it. Left-click remains ordinary
+Dunst dismissal behavior.
+
+`Mod+n` recalls the latest item from Dunst's in-memory history. `Mod+Shift+n`
+opens `pi-notification-history`, a wofi/rofi selector backed by the private,
+durable log at `$XDG_STATE_HOME/pi/notifications.jsonl`; selecting a Pi event
+focuses its recorded terminal when it still exists. The log retains the newest
+500 Pi events and survives Dunst restarts. Dunst itself retains 200 events per
+daemon lifetime; inspect them directly with `dunstctl history | jq`.
 
 ## Pi Settings and Chezmoi Sync
 

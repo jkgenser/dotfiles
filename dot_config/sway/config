@@ -23,6 +23,10 @@ exec --no-startup-id nm-applet
 # Launcher
 bindsym $mod+d exec --no-startup-id wofi --show drun
 
+# Notifications: recall Dunst's latest item, or browse durable Pi events.
+bindsym $mod+n exec --no-startup-id dunstctl history-pop
+bindsym $mod+Shift+n exec --no-startup-id pi-notification-history
+
 # Terminal / window mgmt (unchanged)
 bindsym $mod+Return exec alacritty
 bindsym $mod+Shift+q kill
