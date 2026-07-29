@@ -34,6 +34,21 @@ sudo apt-get update
 sudo apt-get install -y git git-lfs curl wget unzip build-essential zsh ripgrep fd-find jq htop tree ca-certificates gnupg lsb-release alacritty i3 sway waybar wofi rofi polybar xdg-desktop-portal-wlr x11-xserver-utils xinput xss-lock i3lock network-manager-gnome pulseaudio-utils fontconfig
 ```
 
+Install Glow from Charm's official APT repository:
+
+```sh
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
+sudo apt-get update
+sudo apt-get install -y glow
+```
+
+Glow is a system package, so it is intentionally installed during the Linux
+bootstrap rather than by a chezmoi `run_once` script. This keeps `chezmoi
+apply` from unexpectedly requesting `sudo` or changing APT sources. Verify the
+install with `glow --version`.
+
 Install chezmoi, then initialize and apply this repo:
 
 ```sh
