@@ -215,6 +215,19 @@ persists in the live Pi agent directory under
 `~/.pi/agent/extensions/fast-mode/config.json`. This avoids fake priority model
 aliases, so `/compact` can call a real Codex model id.
 
+## Pi Compaction Model
+
+The local extension at `dot_pi/agent/extensions/compaction-model.ts` routes manual
+and automatic compaction through `openai-codex/gpt-5.6-luna`. It calls Pi's
+built-in compaction implementation, preserving its structured summary, split-turn
+handling, file tracking, custom instructions, and current thinking level. Use
+`/compact-current [instructions]` for a one-off compaction with the active model
+instead. The extension reports the model after each compaction and stores `compactionModel` in
+Luna-generated compaction details for observability. If Luna or Codex auth is
+unavailable, Pi falls back to compacting with the active model. DeepSeek Pro
+remains available for model cycling and `worker-lite`; it was not a dedicated
+compaction model before this extension.
+
 ## Pi Token Speed
 
 The local extension at `dot_pi/agent/extensions/token-speed.ts` displays live
