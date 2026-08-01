@@ -34,6 +34,20 @@
           }
         }
       ]
+    },
+    "deepseek": {
+      "modelOverrides": {
+        "deepseek-v4-flash": {
+          "thinkingLevelMap": {
+            "low": "low"
+          }
+        },
+        "deepseek-v4-pro": {
+          "thinkingLevelMap": {
+            "low": "low"
+          }
+        }
+      }
     }
   }
 }
