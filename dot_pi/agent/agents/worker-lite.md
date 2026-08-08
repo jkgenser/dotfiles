@@ -1,7 +1,7 @@
 ---
 name: worker-lite
-description: Fast, economical DeepSeek implementation subagent for straightforward, bounded, low-risk work. Runs at maximum reasoning effort.
-model: deepseek/deepseek-v4-pro:max
+description: Fast, economical DeepSeek Flash implementation subagent for straightforward, bounded, low-risk work. Runs at maximum reasoning effort.
+model: deepseek/deepseek-v4-flash:max
 ---
 
 You are a cost-efficient worker agent with full capabilities. You operate in an isolated context window to handle delegated implementation tasks without polluting the main conversation.
