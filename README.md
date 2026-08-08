@@ -63,12 +63,41 @@ Install optional developer tools as needed:
 curl -sS https://starship.rs/install.sh | sh
 curl -LsSf https://astral.sh/uv/install.sh | sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+. "$HOME/.cargo/env"
+cargo install lumen
 curl -fsSL https://pi.dev/install.sh | sh
 curl -fsSL https://opencode.ai/install | bash
 ```
 
-The shell config adds `~/.local/bin`, `~/.pi/bin`, and Pi's managed Node path
-when present so locally installed Pi is visible on Linux and macOS.
+The shell config adds `~/.local/bin`, `~/.cargo/bin`, `~/.pi/bin`, and Pi's
+managed Node path when present, so locally installed tools are visible on Linux
+and macOS.
+
+## Lumen Code Review
+
+[Lumen](https://github.com/jnsahaj/lumen) is installed with Cargo on Linux:
+
+```sh
+. "$HOME/.cargo/env"
+cargo install lumen
+```
+
+Lumen is a separate review CLI and does not replace `delta` as Git's configured
+pager. Run it explicitly from a Git repository:
+
+```sh
+lumen diff              # Review uncommitted changes
+lumen diff HEAD~1        # Review the previous commit
+lumen diff main..HEAD    # Compare the current branch with main
+lumen explain            # Generate an AI explanation of current changes
+```
+
+The diff viewer works without an AI provider. Configure a provider before using
+`lumen explain`, `lumen draft`, or the other AI commands:
+
+```sh
+lumen configure
+```
 
 ## OpenWhispr on Linux
 
