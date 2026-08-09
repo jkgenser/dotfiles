@@ -254,8 +254,9 @@ handling, file tracking, custom instructions, and current thinking level. Use
 instead. The extension reports the model after each compaction and stores `compactionModel` in
 Luna-generated compaction details for observability. If Luna or Codex auth is
 unavailable, Pi falls back to compacting with the active model. DeepSeek Pro
-remains available for model cycling and `worker-lite`; it was not a dedicated
-compaction model before this extension.
+remains available for model cycling, while `worker-lite` intentionally uses
+DeepSeek V4 Flash at max reasoning; neither was a dedicated compaction model
+before this extension.
 
 ## Pi Token Speed
 
@@ -282,20 +283,22 @@ the reset countdown in Pi's footer. It refreshes from Pi's Codex subscription
 auth after settled runs and every three minutes, with Codex app-server as a
 fallback.
 
-Pi's subagent extension provides three implementation tiers. `worker-lite` uses
-`openai-codex/gpt-5.6-luna` for straightforward, bounded, low-risk work;
-`worker` uses `openai-codex/gpt-5.6-terra` for nontrivial or moderately risky
-work; and `worker-max` uses `openai-codex/gpt-5.6-sol` for the broadest, most
-ambiguous, or highest-risk work. `worker-lite` accepts
-`effort: high|xhigh|max` and defaults to `high`; `worker` and `worker-max`
-accept `effort: medium|high|xhigh` and default to `medium`. Model tier and
-reasoning intensity can therefore be selected independently.
+Pi's general subagent extension retains a small roster: `scout` and
+`scout-flash-max` use DeepSeek V4 Flash for read-only reconnaissance,
+`worker-lite` uses `deepseek/deepseek-v4-flash:max` for straightforward bounded
+implementation, and `worker` uses `openai-codex/gpt-5.6-terra` for nontrivial or
+risky implementation. Planning and code review stay in the smart parent.
 
-For static review, `reviewer-lite` uses `openai-codex/gpt-5.6-luna:xhigh` for
-focused, bounded, low-risk review requests, while `reviewer` retains
-`openai-codex/gpt-5.6-sol:xhigh` for broad, complex, or high-risk review. The
-isolated pull-request workflow continues to use the separately hardened
-`pr-reviewer` agent.
+The local extension at `dot_pi/agent/extensions/supervised-worker/` is the
+preferred bounded implementation path. It starts one persistent
+`deepseek/deepseek-v4-flash:max` Pi RPC subprocess, permits only one writer, and
+routes consequential blocking decisions back into the smart parent session.
+Supervisor answers are arbitrary free text; worker-suggested options are never
+binding. Progress updates remain quiet, while blocking questions and completion
+wake the parent. Child sessions are stored under
+`~/.pi/agent/sessions/supervised-workers/` and can be opened with `pi --session`
+after the managed RPC process completes or is stopped; concurrent attachment to
+a live worker session is intentionally disallowed.
 
 Install Tailscale separately, then authenticate:
 
