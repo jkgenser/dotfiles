@@ -1,18 +1,26 @@
+{{- $profile := get . "profile" | default "desktop" -}}
 Brewfile
 README.md
 
-{{ if ne .chezmoi.os "linux" -}}
-dot_Xmodmap
-dot_config/alacritty
-dot_config/dunst
-dot_config/fontconfig
-dot_config/i3
-dot_config/polybar
-dot_config/rofi
-dot_config/sway
-dot_config/xdg-desktop-portal-wlr
-dot_local/bin/executable_open-whispr
-dot_local/bin/executable_obsidian
-dot_local/share/applications/obsidian.desktop.tmpl
-dot_local/scripts/executable_mouse-settings.sh
+{{ if eq $profile "paseo" -}}
+.Xmodmap
+.config
+.local
+.zshrc
+.pi/agent/extensions/anthropic-vertex.ts
+.pi/agent/extensions/notify.ts
+{{ else if ne .chezmoi.os "linux" -}}
+.Xmodmap
+.config/alacritty
+.config/dunst
+.config/fontconfig
+.config/i3
+.config/polybar
+.config/rofi
+.config/sway
+.config/xdg-desktop-portal-wlr
+.local/bin/open-whispr
+.local/bin/obsidian
+.local/share/applications/obsidian.desktop
+.local/scripts/mouse-settings.sh
 {{ end -}}

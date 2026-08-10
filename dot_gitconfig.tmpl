@@ -1,8 +1,10 @@
+{{- $profile := get . "profile" | default "desktop" -}}
 [user]
 	name = Jerry Genser
 	email = 8715980+jkgenser@users.noreply.github.com
 [init]
 	defaultBranch = main
+{{ if ne $profile "paseo" -}}
 [core]
 	editor = nvim -f
 	pager = delta
@@ -18,22 +20,27 @@
 	side-by-side = true
 [alias]
 	ds = -c delta.features=sbs diff
+{{ end -}}
 [pull]
 	rebase = true
 [merge]
-	tool = nvimdiff
 	conflictStyle = zdiff3
+{{ if ne $profile "paseo" -}}
+	tool = nvimdiff
 [mergetool]
 	keepBackup = false
 	prompt = true
+{{ end -}}
 [credential "https://github.com"]
 	helper = 
 	helper = !gh auth git-credential
 [credential "https://gist.github.com"]
 	helper = 
 	helper = !gh auth git-credential
+{{ if ne $profile "paseo" -}}
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
+{{ end -}}

@@ -2,8 +2,9 @@
 
 Personal dotfiles managed with [chezmoi](https://www.chezmoi.io/).
 
-This repo currently supports macOS and Linux desktop machines. Linux server or
-headless profiles are intentionally deferred for now.
+This repo supports macOS, Linux desktop machines, and a minimal `paseo`
+profile for the persistent home directory in a headless Paseo development
+container.
 
 ## macOS Bootstrap
 
@@ -72,6 +73,43 @@ curl -fsSL https://opencode.ai/install | bash
 The shell config adds `~/.local/bin`, `~/.cargo/bin`, `~/.pi/bin`, and Pi's
 managed Node path when present, so locally installed tools are visible on Linux
 and macOS.
+
+## Paseo / Headless Profile
+
+The `paseo` profile applies shared Git identity and credential-helper settings
+plus headless-compatible Pi configuration. It excludes desktop configuration,
+GUI helper scripts, zsh configuration, Git integrations whose binaries are not
+installed in the container, and the Pi Vertex and desktop-notification
+extensions.
+
+Create the machine-local profile data before initializing chezmoi:
+
+```sh
+mkdir -p ~/.config/chezmoi ~/.local/bin
+cat > ~/.config/chezmoi/chezmoi.toml <<'EOF'
+[data]
+profile = "paseo"
+EOF
+
+sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin
+export PATH="$HOME/.local/bin:$PATH"
+chezmoi init jkgenser/dotfiles
+chezmoi diff
+chezmoi apply
+```
+
+The profile selects Pi's light theme, OpenAI Codex `gpt-5.6-sol`, and high
+thinking by default. Pi provider authentication, GitHub authentication,
+sessions, trust decisions, and generated state remain machine-local and are
+not managed by this repository.
+
+Review later updates before applying executable Pi extensions:
+
+```sh
+chezmoi git pull -- --ff-only
+chezmoi diff
+chezmoi apply
+```
 
 ## Lumen Code Review
 

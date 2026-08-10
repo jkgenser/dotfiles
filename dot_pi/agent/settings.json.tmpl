@@ -1,0 +1,20 @@
+{{- $profile := get . "profile" | default "desktop" -}}
+{
+  "theme": {{ if eq $profile "paseo" }}"light"{{ else }}"dark"{{ end }},
+  "defaultProvider": {{ if eq $profile "paseo" }}"openai-codex"{{ else }}"anthropic-vertex"{{ end }},
+  "defaultModel": {{ if eq $profile "paseo" }}"gpt-5.6-sol"{{ else }}"claude-opus-5"{{ end }},
+  "defaultThinkingLevel": {{ if eq $profile "paseo" }}"high"{{ else }}"xhigh"{{ end }},
+  "enabledModels": [
+    "openai-codex/gpt-5.6-sol",
+    "openai-codex/gpt-5.6-terra",
+    "openai-codex/gpt-5.6-luna",
+    "deepseek/deepseek-v4-flash"
+  ],
+  "lastChangelogVersion": "0.84.1",
+  "tokenSpeed": {
+    "windowMs": 1000,
+    "showTtft": true,
+    "showFinalAverage": true
+  },
+  "packages": []
+}
