@@ -99,9 +99,10 @@ chezmoi apply
 ```
 
 The profile selects Pi's light theme, OpenAI Codex `gpt-5.6-sol`, and high
-thinking by default. Pi provider authentication, GitHub authentication,
-sessions, trust decisions, and generated state remain machine-local and are
-not managed by this repository.
+thinking by default. It also adds `~/.local/bin` to login-shell `PATH`. Pi
+provider authentication, GitHub authentication, sessions, trust decisions,
+and generated state remain machine-local and are not managed by this
+repository.
 
 Review later updates before applying executable Pi extensions:
 

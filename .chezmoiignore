@@ -24,3 +24,7 @@ README.md
 .local/share/applications/obsidian.desktop
 .local/scripts/mouse-settings.sh
 {{ end -}}
+
+{{ if ne $profile "paseo" -}}
+.profile
+{{ end -}}
