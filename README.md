@@ -236,7 +236,8 @@ swaymsg '[app_id="obsidian"] focus'
 Pi completion and questionnaire notifications identify the project, session, and
 Sway/i3 workspace. Middle-clicking a live Pi notification invokes its Dunst
 action and focuses the terminal that produced it. Left-click remains ordinary
-Dunst dismissal behavior.
+Dunst dismissal behavior. Start Pi with `pi --no-notifications` when another
+parent application, such as Paseo, handles notifications for the session.
 
 `Mod+n` recalls the latest item from Dunst's in-memory history. `Mod+Shift+n`
 opens `pi-notification-history`, a wofi/rofi selector backed by the private,

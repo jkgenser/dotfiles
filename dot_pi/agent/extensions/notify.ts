@@ -30,6 +30,12 @@ type Notification = {
 }
 
 export default function (pi: ExtensionAPI) {
+  pi.registerFlag("no-notifications", {
+    description: "Disable completion and questionnaire desktop notifications",
+    type: "boolean",
+    default: false,
+  })
+
   const lastNotification = new Map<string, number>()
 
   const shouldNotify = (key: string) => {
@@ -237,7 +243,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   const scheduleNotification = (key: string, kind: string, message: string, ctx: ExtensionContext) => {
-    if (!shouldNotify(key)) return
+    if (pi.getFlag("no-notifications") === true || !shouldNotify(key)) return
     const notification = buildNotification(kind, message, ctx)
 
     setImmediate(() => {
