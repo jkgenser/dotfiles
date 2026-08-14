@@ -30,7 +30,7 @@ import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
-const WORKER_EFFORTS = ["low", "high", "max"] as const;
+const WORKER_EFFORTS = ["low", "medium", "high"] as const;
 type WorkerEffort = (typeof WORKER_EFFORTS)[number];
 const DEFAULT_WORKER_EFFORT: WorkerEffort = "high";
 const THINKING_SUFFIX_RE = /:(off|minimal|low|medium|high|xhigh|max)$/;
@@ -470,8 +470,7 @@ async function runSingleAgent(
 }
 
 const WorkerEffortSchema = StringEnum(WORKER_EFFORTS, {
-	description:
-		'Reasoning effort for the "worker" agent. Supported values: low, high, max. Default: high.',
+	description: 'Reasoning effort for the "worker" agent. Supported values: low, medium, high. Default: high.',
 });
 
 const TaskItem = Type.Object({
@@ -515,11 +514,11 @@ export default function (pi: ExtensionAPI) {
 		name: "subagent",
 		label: "Subagent",
 		description: [
-			"Delegate implementation or codebase reconnaissance to isolated subagents.",
+			"Delegate implementation, browser automation, or codebase reconnaissance to isolated subagents.",
 			"Handle ordinary tasks and all code reviews directly in the main agent; do not delegate merely because a task is multi-file or nontrivial.",
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
-			'Use "scout" or "scout-flash-max" only for read-only static codebase reconnaissance with read/grep/find/ls; never delegate shell commands, SQL/database operations, Docker, or other infrastructure/runtime actions to them—the main agent must perform those directly. Use "worker-lite" for straightforward bounded implementation and "worker" for nontrivial or risky implementation.',
-			'"scout" uses direct DeepSeek V4 Flash at high reasoning; "scout-flash-max" uses direct DeepSeek V4 Flash at max; "worker-lite" uses direct DeepSeek V4 Flash at max; "worker" uses DeepSeek V4 Pro with optional effort=low/high/max (default high).',
+			'Use "scout" or "scout-gemini" only for read-only static codebase reconnaissance with read/grep/find/ls; never delegate shell commands, SQL/database operations, Docker, or other infrastructure/runtime actions to them—the main agent must perform those directly. Use "worker-lite" for straightforward bounded implementation, "worker" for nontrivial or risky implementation, and "browser" for Playwright-driven UI investigation, testing, and verification.',
+			'"scout" uses OpenAI Codex Luna at high reasoning; "scout-gemini" uses Gemini 3.7 Flash at medium reasoning; "worker-lite" uses OpenAI Codex Luna at high reasoning; "worker" uses Gemini 3.7 Flash with optional effort=low/medium/high (default high); "browser" uses OpenAI Codex Luna.',
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
 		].join(" "),

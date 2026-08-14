@@ -322,20 +322,18 @@ the reset countdown in Pi's footer. It refreshes from Pi's Codex subscription
 auth after settled runs and every three minutes, with Codex app-server as a
 fallback.
 
-Pi's subagent extension provides three implementation tiers. `worker-lite` uses
-`openai-codex/gpt-5.6-luna` for straightforward, bounded, low-risk work;
-`worker` uses `openai-codex/gpt-5.6-terra` for nontrivial or moderately risky
-work; and `worker-max` uses `openai-codex/gpt-5.6-sol` for the broadest, most
-ambiguous, or highest-risk work. `worker-lite` accepts
-`effort: high|xhigh|max` and defaults to `high`; `worker` and `worker-max`
-accept `effort: medium|high|xhigh` and default to `medium`. Model tier and
-reasoning intensity can therefore be selected independently.
+## Pi Subagents
 
-For static review, `reviewer-lite` uses `openai-codex/gpt-5.6-luna:xhigh` for
-focused, bounded, low-risk review requests, while `reviewer` retains
-`openai-codex/gpt-5.6-sol:xhigh` for broad, complex, or high-risk review. The
-isolated pull-request workflow continues to use the separately hardened
-`pr-reviewer` agent.
+Pi's subagent extension provides specialized reconnaissance and implementation
+subagents in isolated context windows:
+
+- `scout`: fast, read-only static codebase reconnaissance using `openai-codex/gpt-5.6-luna:high`.
+- `scout-gemini`: thorough, read-only static codebase reconnaissance using `google-vertex/gemini-3.7-flash:medium`.
+- `worker-lite`: economical implementation subagent for straightforward, bounded, low-risk tasks using `openai-codex/gpt-5.6-luna:high`.
+- `worker`: implementation subagent for nontrivial, multi-file, or risky tasks using `google-vertex/gemini-3.7-flash:high` with optional per-invocation `effort: low|medium|high` (defaults to `high`).
+- `browser`: browser automation worker for Playwright-driven UI investigation and testing using `openai-codex/gpt-5.6-luna`.
+
+Planning and code review are handled directly in the main agent.
 
 Install Tailscale separately, then authenticate:
 
