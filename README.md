@@ -327,7 +327,7 @@ fallback.
 Pi's subagent extension provides specialized reconnaissance and implementation
 subagents in isolated context windows:
 
-- `scout`: fast, read-only static codebase reconnaissance using `openai-codex/gpt-5.6-luna:high`.
+- `scout`: fast, read-only static codebase reconnaissance using `google-vertex/gemini-3.8-flash:high`.
 - `worker-lite`: economical implementation subagent for straightforward, bounded, low-risk tasks using `openai-codex/gpt-5.6-luna:high`.
 - `worker`: implementation subagent for nontrivial, multi-file, or risky tasks using `openai-codex/gpt-5.6-terra:high` with optional per-invocation `effort: low|medium|high` (defaults to `high`).
 - `browser`: browser automation worker for Playwright-driven UI investigation and testing using `openai-codex/gpt-5.6-luna`.

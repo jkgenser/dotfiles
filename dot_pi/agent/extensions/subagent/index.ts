@@ -518,7 +518,7 @@ export default function (pi: ExtensionAPI) {
 			"Handle ordinary tasks and all code reviews directly in the main agent; do not delegate merely because a task is multi-file or nontrivial.",
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
 			'Use "scout" only for read-only static codebase reconnaissance with read/grep/find/ls; never delegate shell commands, SQL/database operations, Docker, or other infrastructure/runtime actions to it—the main agent must perform those directly. Use "worker-lite" for straightforward bounded implementation, "worker" for nontrivial or risky implementation, and "browser" for Playwright-driven UI investigation, testing, and verification.',
-			'"scout" uses OpenAI Codex Luna at high reasoning; "worker-lite" uses OpenAI Codex Luna at high reasoning; "worker" uses OpenAI Codex Terra with optional effort=low/medium/high (default high); "browser" uses OpenAI Codex Luna.',
+			'"scout" uses Google Vertex Gemini 3.8 Flash at high reasoning; "worker-lite" uses OpenAI Codex Luna at high reasoning; "worker" uses OpenAI Codex Terra with optional effort=low/medium/high (default high); "browser" uses OpenAI Codex Luna.',
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
 		].join(" "),
