@@ -19,8 +19,9 @@ description: Create Linear issues for the olerhealth workspace and OLE team. Use
 2. Identify a clear title and useful Markdown description from the actual task. Do not invent findings. Include relevant reproduction steps, expected/actual behavior, evidence, and acceptance criteria when known. Exclude secrets and unnecessary patient/personal data.
 3. Search a few distinctive title keywords for possible duplicates. Search is substring-based, limited to 25 matches, and not exhaustive. If an apparent duplicate exists, show it and ask whether to create another.
 4. Submit JSON on stdin with `title` and optional `description`. No other fields are currently supported. Do not guess project/status IDs or silently ignore requested metadata: explain the limitation first.
-5. Return the created issue identifier and URL. Never claim creation succeeded without a confirmed API result.
-6. Never automatically retry a creation after an error or timeout: it may have succeeded. Search/check Linear first; ask if uncertain.
+5. If the work already has a known GitHub PR, associate it after creation by adding the confirmed issue identifier to the PR title (for example, `OLE-123 Existing PR title`). First inspect the PR with `gh pr view --json number,title,url`; preserve the existing title verbatim, do not add the identifier twice, and update only that PR with `gh pr edit <number-or-url> --title <new-title>`. Treat this as part of an explicitly requested issue-filing workflow, but state that the GitHub integration must be enabled for Linear to create the link. If `gh` cannot identify the PR unambiguously, ask instead of guessing. Do not use a closing keyword merely to associate it.
+6. Return the created issue identifier and URL, plus the updated PR URL when applicable. Never claim creation or association succeeded without confirmed command results.
+7. Never automatically retry a creation after an error or timeout: it may have succeeded. Search/check Linear first; ask if uncertain.
 
 ## Commands
 
