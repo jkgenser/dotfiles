@@ -327,12 +327,12 @@ fallback.
 Pi's subagent extension provides specialized reconnaissance and implementation
 subagents in isolated context windows:
 
-- `scout`: fast, read-only static codebase reconnaissance using `google-vertex/gemini-3.8-flash:high`.
-- `worker-lite`: economical implementation subagent for straightforward, bounded, low-risk tasks using `openai-codex/gpt-5.6-luna:high`.
-- `worker`: implementation subagent for nontrivial, multi-file, or risky tasks using `openai-codex/gpt-5.6-terra:high` with optional per-invocation `effort: low|medium|high` (defaults to `high`).
+- `scout`: fast, read-only static codebase reconnaissance using `google-vertex/gemini-3.8-flash:medium`.
+- `worker-lite`: economical implementation subagent for straightforward, bounded, low-risk tasks using `google-vertex/gemini-3.8-flash:high`.
+- `worker`: implementation subagent for nontrivial, multi-file, or risky tasks using `google-vertex/gemini-3.8-flash:high` with optional per-invocation `effort: low|medium|high` (defaults to `high`).
 - `browser`: browser automation worker for Playwright-driven UI investigation and testing using `openai-codex/gpt-5.6-luna`.
 
-Planning and code review are handled directly in the main agent.
+Planning and code review are handled directly in the main agent. Worker tasks should include sufficient context, constraints, and validation expectations; inspect and validate their changes carefully afterward.
 
 Install Tailscale separately, then authenticate:
 

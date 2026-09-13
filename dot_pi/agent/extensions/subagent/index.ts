@@ -32,7 +32,7 @@ import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
 const WORKER_EFFORTS = ["low", "medium", "high"] as const;
 type WorkerEffort = (typeof WORKER_EFFORTS)[number];
-const DEFAULT_WORKER_EFFORT: WorkerEffort = "medium";
+const DEFAULT_WORKER_EFFORT: WorkerEffort = "high";
 const THINKING_SUFFIX_RE = /:(off|minimal|low|medium|high|xhigh|max)$/;
 
 const MAX_PARALLEL_TASKS = 8;
@@ -470,7 +470,7 @@ async function runSingleAgent(
 }
 
 const WorkerEffortSchema = StringEnum(WORKER_EFFORTS, {
-	description: 'Reasoning effort for the "worker" agent. Supported values: low, medium, high. Default: medium.',
+	description: 'Reasoning effort for the "worker" agent. Supported values: low, medium, high. Default: high.',
 });
 
 const TaskItem = Type.Object({
@@ -516,9 +516,10 @@ export default function (pi: ExtensionAPI) {
 		description: [
 			"Delegate implementation, browser automation, or codebase reconnaissance to isolated subagents.",
 			"Handle ordinary tasks and all code reviews directly in the main agent; do not delegate merely because a task is multi-file or nontrivial.",
+			"When delegating to any worker, provide sufficient task context, constraints, and validation expectations; independently inspect and validate its changes carefully afterward.",
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
 			'Use "scout" and "scout-dsflash" only for read-only static codebase reconnaissance with read/grep/find/ls; never delegate shell commands, SQL/database operations, Docker, or other infrastructure/runtime actions to it—the main agent must perform those directly. Use "worker-lite" for straightforward bounded implementation, "worker" for nontrivial or risky implementation, "worker-dsflash" for implementation tasks using DeepSeek V4.1 Flash, and "browser" for Playwright-driven UI investigation, testing, and verification.',
-			'"scout-dsflash" uses direct DeepSeek V4.1 Flash at high reasoning; "scout" uses Google Vertex Gemini 3.8 Flash at high reasoning; "worker-lite" uses Google Vertex Gemini 3.8 Flash at high reasoning; "worker" uses OpenAI Codex Sol with optional effort=low/medium/high (default medium); "worker-dsflash" uses direct DeepSeek V4.1 Flash at high reasoning; "browser" uses OpenAI Codex Luna.',
+			'"scout-dsflash" uses direct DeepSeek V4.1 Flash at high reasoning; "scout" uses Google Vertex Gemini 3.8 Flash at medium reasoning; "worker-lite" uses Google Vertex Gemini 3.8 Flash at high reasoning; "worker" uses Google Vertex Gemini 3.8 Flash with optional effort=low/medium/high (default high); "worker-dsflash" uses direct DeepSeek V4.1 Flash at high reasoning; "browser" uses OpenAI Codex Luna.',
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
 		].join(" "),
