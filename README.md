@@ -100,9 +100,9 @@ chezmoi apply
 
 The profile selects Pi's light theme, OpenAI Codex `gpt-5.6-sol`, and high
 thinking by default. It also adds `~/.local/bin` to login-shell `PATH`. Pi
-provider authentication, GitHub authentication, sessions, trust decisions,
-and generated state remain machine-local and are not managed by this
-repository.
+provider authentication, GitHub authentication, sessions, saved trust decisions,
+and generated state remain machine-local. The repository-trust extension below
+provides a managed automatic-approval policy without writing saved decisions.
 
 Review later updates before applying executable Pi extensions:
 
@@ -272,6 +272,19 @@ This matters when removing Pi packages. For example, after running
 `pi remove npm:context-mode`, the live settings may have `"packages": []` while
 the chezmoi source still contains `"npm:context-mode"`. Re-add the file before
 committing dotfiles so `chezmoi apply` does not bring the removed package back.
+
+## Pi Repository Trust
+
+The global extension at `dot_pi/agent/extensions/repository-trust/` automatically
+approves project resources for `~/oler` and its registered linked worktrees,
+regardless of Paseo's generated worktree paths or the checked-out branch.
+It matches the canonical Git common directory, not repository names or remotes;
+separate clones and unrelated repositories follow Pi's normal trust flow.
+Saved trust decisions (including denials) and CLI overrides remain authoritative.
+
+This permits executable project extensions/packages as well as skills on all
+Oler branches. Review the [policy, activation steps, and tests](dot_pi/agent/extensions/repository-trust/README.md)
+before applying it. It does not write `trust.json` or trust all Paseo worktrees.
 
 ## Pi Fast Mode
 
