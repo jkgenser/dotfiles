@@ -286,6 +286,23 @@ This permits executable project extensions/packages as well as skills on all
 Oler branches. Review the [policy, activation steps, and tests](dot_pi/agent/extensions/repository-trust/README.md)
 before applying it. It does not write `trust.json` or trust all Paseo worktrees.
 
+## Pi Custom GPT-6 Models
+
+`dot_pi/agent/models.json` adds `openai-codex/gpt-6-sol` and
+`openai-codex/gpt-6-luna` ahead of Pi's built-in catalog. Both reuse existing
+Codex authentication and are included in model cycling; the 5.6 models are
+excluded from the scoped picker. The browser agent still uses 5.6 Luna;
+compaction uses GPT-6 Luna. Backend access is still required.
+
+Their 272K context, 128K output, image input, and reasoning levels (through
+`max`) are provisional, based on the existing Codex models, not verified GPT-6
+Sol/Luna specifications. Pricing is omitted (Pi displays zero, not actual
+pricing). Remove these custom entries once Pi ships official metadata, since
+custom entries replace built-in models with the same IDs.
+
+Apply with `chezmoi apply ~/.pi/agent/models.json ~/.pi/agent/settings.json`,
+then restart Pi and select either model with `/model`.
+
 ## Pi Fast Mode
 
 Pi defaults to the real `openai-codex/gpt-5.6-sol` model, with GPT-5.5 retained
@@ -300,7 +317,7 @@ aliases, so `/compact` can call a real Codex model id.
 ## Pi Compaction Model
 
 The local extension at `dot_pi/agent/extensions/compaction-model.ts` routes manual
-and automatic compaction through `openai-codex/gpt-5.6-luna`. It calls Pi's
+and automatic compaction through `openai-codex/gpt-6-luna`. It calls Pi's
 built-in compaction implementation, preserving its structured summary, split-turn
 handling, file tracking, custom instructions, and current thinking level. Use
 `/compact-current [instructions]` for a one-off compaction with the active model

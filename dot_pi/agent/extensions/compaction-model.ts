@@ -5,7 +5,7 @@ import {
 } from "@earendil-works/pi-coding-agent"
 
 const COMPACTION_PROVIDER = "openai-codex"
-const COMPACTION_MODEL = "gpt-5.6-luna"
+const COMPACTION_MODEL = "gpt-6-luna"
 const COMPACTION_MODEL_KEY = `${COMPACTION_PROVIDER}/${COMPACTION_MODEL}`
 
 const notify = (
