@@ -286,22 +286,15 @@ This permits executable project extensions/packages as well as skills on all
 Oler branches. Review the [policy, activation steps, and tests](dot_pi/agent/extensions/repository-trust/README.md)
 before applying it. It does not write `trust.json` or trust all Paseo worktrees.
 
-## Pi Custom GPT-6 Models
+## Pi GPT-6 Models
 
-`dot_pi/agent/models.json` adds `openai-codex/gpt-6-sol` and
-`openai-codex/gpt-6-luna` ahead of Pi's built-in catalog. Both reuse existing
-Codex authentication and are included in model cycling; the 5.6 models are
-excluded from the scoped picker. The browser agent still uses 5.6 Luna;
-compaction uses GPT-6 Luna. Backend access is still required.
-
-Their 272K context, 128K output, image input, and reasoning levels (through
-`max`) are provisional, based on the existing Codex models, not verified GPT-6
-Sol/Luna specifications. Pricing is omitted (Pi displays zero, not actual
-pricing). Remove these custom entries once Pi ships official metadata, since
-custom entries replace built-in models with the same IDs.
-
-Apply with `chezmoi apply ~/.pi/agent/models.json ~/.pi/agent/settings.json`,
-then restart Pi and select either model with `/model`.
+Pi provides `openai-codex/gpt-6-astra`, `openai-codex/gpt-6-sol`, and
+`openai-codex/gpt-6-luna` in its built-in catalog. Their entries in
+`dot_pi/agent/settings.json.tmpl` keep them in the startup/model-cycling scope
+without overriding Pi's model metadata. `/model` can still select them; the
+browser agent still uses 5.6 Luna, while compaction uses GPT-6 Luna. Codex
+backend access is required. Apply the removal of the old custom definitions
+with `chezmoi apply ~/.pi/agent/models.json`, then restart Pi.
 
 ## Pi Fast Mode
 

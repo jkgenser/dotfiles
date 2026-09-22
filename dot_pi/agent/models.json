@@ -1,39 +1,5 @@
 {
   "providers": {
-    "openai-codex": {
-      "models": [
-        {
-          "id": "gpt-6-sol",
-          "name": "GPT-6 Sol (custom)",
-          "api": "openai-codex-responses",
-          "reasoning": true,
-          "thinkingLevelMap": {
-            "off": null,
-            "minimal": "low",
-            "xhigh": "xhigh",
-            "max": "max"
-          },
-          "input": ["text", "image"],
-          "contextWindow": 272000,
-          "maxTokens": 128000
-        },
-        {
-          "id": "gpt-6-luna",
-          "name": "GPT-6 Luna (custom)",
-          "api": "openai-codex-responses",
-          "reasoning": true,
-          "thinkingLevelMap": {
-            "off": null,
-            "minimal": "low",
-            "xhigh": "xhigh",
-            "max": "max"
-          },
-          "input": ["text", "image"],
-          "contextWindow": 272000,
-          "maxTokens": 128000
-        }
-      ]
-    },
     "google-vertex": {
       "baseUrl": "https://{location}-aiplatform.googleapis.com",
       "models": [
