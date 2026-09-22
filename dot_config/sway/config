@@ -4,6 +4,7 @@ font pango:monospace 8
 
 # Autostart
 exec --no-startup-id dex-autostart --autostart --environment sway
+exec --no-startup-id /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1
 
 
 # idle tool
