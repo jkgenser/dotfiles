@@ -25,6 +25,7 @@ const TARGET_MODEL_IDS = new Set([
   "claude-opus-4-6",
   "claude-opus-4-8",
   "claude-opus-5",
+  "claude-opus-5-5",
   "claude-fable-5",
 ])
 
@@ -218,10 +219,12 @@ const formatVertexError = async (response: Response): Promise<string> => {
 }
 
 class AnthropicVertexMessagesShim {
-  readonly messages = {
-    create: (params: MessagesCreateParams, requestOptions?: VertexRequestOptions) => ({
-      asResponse: () => this.createMessagesResponse(params, requestOptions),
-    }),
+  readonly beta = {
+    messages: {
+      create: (params: MessagesCreateParams, requestOptions?: VertexRequestOptions) => ({
+        asResponse: () => this.createMessagesResponse(params, requestOptions),
+      }),
+    },
   }
 
   constructor(
@@ -239,7 +242,12 @@ class AnthropicVertexMessagesShim {
       throw new Error("Anthropic Vertex request is missing params.model")
     }
 
-    const { model: _model, ...body } = params
+    // Anthropic's SDK sends `betas` as a header, not as a request-body field.
+    const { model: _model, betas, ...body } = params
+    const betaHeaders = [
+      ...(this.defaultHeaders["anthropic-beta"]?.split(",") ?? []),
+      ...(Array.isArray(betas) ? betas.filter((beta): beta is string => typeof beta === "string") : []),
+    ].map((beta) => beta.trim()).filter(Boolean)
     const { location, host } = resolveVertexLocation(this.location)
     const url =
       `https://${host}/v1/projects/${encodeURIComponent(this.project)}` +
@@ -250,6 +258,7 @@ class AnthropicVertexMessagesShim {
       method: "POST",
       headers: {
         ...this.defaultHeaders,
+        ...(betaHeaders.length > 0 ? { "anthropic-beta": [...new Set(betaHeaders)].join(",") } : {}),
         Authorization: `Bearer ${getAccessToken()}`,
         "Content-Type": "application/json",
       },
@@ -391,7 +400,13 @@ export default function (pi: ExtensionAPI) {
     .map(({ id, name, compat, reasoning, thinkingLevelMap, input, cost, contextWindow, maxTokens }) => ({
       id,
       name: `${name} (Vertex AI)`,
-      compat,
+      // Vertex rejects mid-conversation effort messages.
+      // Strict tools are temporarily disabled pending a successful policy-propagation retest.
+      compat: {
+        ...compat,
+        supportsMidConvoEffort: false,
+        supportsStrictTools: false,
+      },
       reasoning,
       thinkingLevelMap,
       input,
@@ -415,7 +430,7 @@ export default function (pi: ExtensionAPI) {
       compat: {
         forceAdaptiveThinking: true,
         supportsTemperature: false,
-        supportsStrictTools: true,
+        supportsStrictTools: false,
       },
     })
   }
