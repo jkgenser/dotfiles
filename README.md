@@ -98,7 +98,7 @@ chezmoi diff
 chezmoi apply
 ```
 
-The profile selects Pi's light theme, OpenAI Codex `gpt-5.6-sol`, and high
+The profile selects Pi's light theme, OpenAI Codex `gpt-6.1-sol`, and high
 thinking by default. It also adds `~/.local/bin` to login-shell `PATH`. Pi
 provider authentication, GitHub authentication, sessions, saved trust decisions,
 and generated state remain machine-local. The repository-trust extension below
@@ -288,7 +288,7 @@ before applying it. It does not write `trust.json` or trust all Paseo worktrees.
 
 ## Pi GPT-6 Models
 
-Pi provides `openai-codex/gpt-6-astra`, `openai-codex/gpt-6-sol`, and
+Pi provides `openai-codex/gpt-6-astra`, `openai-codex/gpt-6.1-sol`, and
 `openai-codex/gpt-6-luna` in its built-in catalog. Their entries in
 `dot_pi/agent/settings.json.tmpl` keep them in the startup/model-cycling scope
 without overriding Pi's model metadata. `/model` can still select them; the
@@ -298,8 +298,7 @@ with `chezmoi apply ~/.pi/agent/models.json`, then restart Pi.
 
 ## Pi Fast Mode
 
-Pi defaults to the real `openai-codex/gpt-5.6-sol` model, with GPT-5.5 retained
-as a temporary fallback in the model scope. The local extension at
+The Paseo profile defaults to `openai-codex/gpt-6.1-sol`. The local extension at
 `dot_pi/agent/extensions/service-tier-priority.ts` adds `/fast [on|off|toggle]`,
 which toggles OpenAI `service_tier: "priority"` for supported GPT-5.4, GPT-5.5,
 and GPT-5.6 family requests through OpenAI and OpenAI Codex. The toggle state
