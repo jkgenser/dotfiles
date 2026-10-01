@@ -36,25 +36,59 @@ async function readInput() {
   return text;
 }
 
+function projectSlugFromUrl(value) {
+  let url;
+  try { url = new URL(value); }
+  catch { throw new Error('projectUrl must be a Linear project URL in olerhealth.'); }
+  const match = url.pathname.match(/^\/olerhealth\/project\/[^/]+-([a-f0-9]{12})(?:\/overview)?\/?$/);
+  if (url.origin !== 'https://linear.app' || url.username || url.password || !match) {
+    throw new Error('projectUrl must be an https://linear.app/olerhealth/project/<name>-<slug> URL (optionally /overview).');
+  }
+  return match[1];
+}
+
+async function resolveProject(api, slugId, team) {
+  const result = await api(`query SkillProject($id: String!) {
+    project(id: $id) { id name slugId url teams { nodes { id key } } }
+  }`, { id: slugId });
+  const project = result.project;
+  if (!project?.id || project.slugId !== slugId || projectSlugFromUrl(project.url) !== slugId) {
+    throw new Error('Project lookup did not match the requested URL. No issue was created.');
+  }
+  if (!project.teams?.nodes?.some(candidate => candidate.id === team.id && candidate.key === TEAM_KEY)) {
+    throw new Error('Requested project is not associated with OLE. No issue was created.');
+  }
+  return project;
+}
+
 export async function execute(args, { api = request, input = readInput } = {}) {
   const [command, ...rest] = args;
   if (!command || command === 'help' || command === '--help') {
-    return { usage: ['linear.mjs team', 'linear.mjs search <title keywords>', 'linear.mjs create < issue.json'], team: TEAM_KEY, workspace: WORKSPACE };
+    return { usage: ['linear.mjs team', 'linear.mjs search <title keywords>', 'linear.mjs project <project URL>', 'linear.mjs create < issue.json (title, description?, projectUrl?)'], team: TEAM_KEY, workspace: WORKSPACE };
   }
-  if (!['team', 'search', 'create'].includes(command)) throw new Error('Unknown command. Use --help.');
-  if (command !== 'search' && rest.length) throw new Error('Unexpected arguments. Create accepts JSON on stdin, not command-line fields.');
+  if (!['team', 'search', 'project', 'create'].includes(command)) throw new Error('Unknown command. Use --help.');
+  if (!['search', 'project'].includes(command) && rest.length) throw new Error('Unexpected arguments. Create accepts JSON on stdin, not command-line fields.');
   const term = rest.join(' ').trim();
   if (command === 'search' && !term) throw new Error('Search requires title keywords.');
+  let projectSlug;
+  if (command === 'project') {
+    if (rest.length !== 1) throw new Error('Project requires one safely quoted project URL.');
+    projectSlug = projectSlugFromUrl(rest[0]);
+  }
   let payload;
   if (command === 'create') {
     try { payload = JSON.parse(await input()); }
     catch { throw new Error('Expected an issue JSON object on stdin.'); }
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Expected an issue JSON object.');
-    const allowed = ['title', 'description'];
-    if (Object.keys(payload).some(k => !allowed.includes(k))) throw new Error('Supported fields: title, description. Team is fixed to OLE; other metadata is not supported yet.');
+    const allowed = ['title', 'description', 'projectUrl'];
+    if (Object.keys(payload).some(k => !allowed.includes(k))) throw new Error('Supported fields: title, description, projectUrl. Team is fixed to OLE; other metadata is not supported yet.');
     if (typeof payload.title !== 'string' || !payload.title.trim()) throw new Error('A nonempty title is required.');
     if (payload.description !== undefined && typeof payload.description !== 'string') throw new Error('Description must be a Markdown string.');
     payload.title = payload.title.trim();
+    if (payload.projectUrl !== undefined) {
+      if (typeof payload.projectUrl !== 'string') throw new Error('projectUrl must be a Linear project URL string.');
+      projectSlug = projectSlugFromUrl(payload.projectUrl);
+    }
   }
   const context = await api(`query SkillTeam($key: String!) {
     organization { name urlKey }
@@ -74,11 +108,18 @@ export async function execute(args, { api = request, input = readInput } = {}) {
     }`, { teamId: team.id, term });
     return { ...result.issues, note: 'Title substring matches only; not a comprehensive duplicate check. Refine keywords if needed.' };
   }
+  const project = projectSlug ? await resolveProject(api, projectSlug, team) : undefined;
+  if (command === 'project') return project;
+  const { projectUrl: _projectUrl, ...issueFields } = payload;
   const result = await api(`mutation SkillCreate($input: IssueCreateInput!) {
-    issueCreate(input: $input) { success issue { id identifier title url } }
-  }`, { input: { ...payload, teamId: team.id } });
+    issueCreate(input: $input) { success issue { id identifier title url project { id name url } } }
+  }`, { input: { ...issueFields, teamId: team.id, ...(project ? { projectId: project.id } : {}) } });
   if (!result.issueCreate?.success || !result.issueCreate.issue) throw new Error('Creation not confirmed. Check Linear before retrying.');
-  return result.issueCreate.issue;
+  const issue = result.issueCreate.issue;
+  if (project && issue.project?.id !== project.id) {
+    throw new Error(`Issue ${issue.identifier} was created (${issue.url}), but project assignment was not confirmed. Inspect that issue; do not recreate it.`);
+  }
+  return issue;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
