@@ -1,9 +1,9 @@
 {{- $profile := get . "profile" | default "desktop" -}}
 {
   "theme": {{ if eq $profile "paseo" }}"light"{{ else }}"dark"{{ end }},
-  "defaultProvider": {{ if eq $profile "paseo" }}"openai-codex"{{ else }}"anthropic-vertex"{{ end }},
-  "defaultModel": {{ if eq $profile "paseo" }}"gpt-6.1-sol"{{ else }}"claude-opus-5"{{ end }},
-  "defaultThinkingLevel": {{ if eq $profile "paseo" }}"high"{{ else }}"xhigh"{{ end }},
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-6.1-sol",
+  "defaultThinkingLevel": "high",
   "defaultTools": ["+codemode"],
   "enabledModels": [
     "openai-codex/gpt-6-astra",
